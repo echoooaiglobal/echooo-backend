@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+playwright
+sqlalchemy
+psycopg2
+dotenv
+alembic
+fastapi-users
+pandas
+openpyxl
+celery
