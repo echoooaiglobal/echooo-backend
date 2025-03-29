@@ -7,6 +7,8 @@ from app.Services.Instagram.StoryMessagingService import StoryMessagingService
 from config.settings import INSTAGRAM_URL
 from config.database import SessionLocal
 from app.Models.Influencer import Influencer
+import random
+import asyncio
 
 router = APIRouter()
 
@@ -18,38 +20,49 @@ def get_db():
         db.close()
 
 @router.post("/send-messages")
-def send_messages(db: Session = Depends(get_db)):
-    # Retrieve all influencers from the database
-    influencers = db.query(Influencer).all()
-    usernames = [influencer.username for influencer in influencers]
-    print(f"Usernamesss: {usernames}")
-    if not usernames:
+async def send_messages(db: Session = Depends(get_db)):
+    influencers = db.query(Influencer).filter(Influencer.message_status == False).all()
+
+    if not influencers:
         return {"message": "No influencers found to send messages."}
 
-    login_service = LoginService()
-    page = login_service.login()  # Login once, session persists
+    async with LoginService() as login_service:
+        page = await login_service.login()
 
-    results = []
-    for username in usernames:
-        print(f"🔹 Visiting profile: {username}")
-        page.goto(f"{INSTAGRAM_URL}/{username}/")
-        page.wait_for_timeout(5000)  # Ensure page loads
+        MESSAGE = """Hello,\n\nI’m Sarah from Echooo.AI, an Influencer Management Platform working with brands like Nestlé, Packages Group, Sutas Dairy, HerBeauty, Moyuum, and Fasset across Pakistan and the MENA region.\n\nNestlé is looking for influencers to help create awareness about child malnutrition in Pakistan through a paid collaboration. The scope includes:\n\n\u2022  1 Instagram Reel or YouTube Video (platform based on preference)\n\u2022  3–4 Instagram Stories or 1–2 YouTube Shorts\n\u2022  Cross-posting on all your social media handles\n\nPayment: Processed within 30–45 days after content goes live (15% platform fee applies).\n\nIf interested, please share your charges, availability, and social media URLs.\n\nLooking forward to your response!\n\nBest,\nSarah\nEchooo.AI"""
 
-        profile_service = ProfileAnalysisService(page)
-        dm_service = DMService(page)
-        story_service = StoryMessagingService(page)
+        results = []
+        for influencer in influencers:
+            username = influencer.username
+            print(f"🔹 Visiting profile: {username}")
+            await page.goto(f"{INSTAGRAM_URL}/{username}/")
+            await asyncio.sleep(5)
 
-        profile = profile_service.check_profile(username)
+            profile_service = ProfileAnalysisService(page)
+            dm_service = DMService(page)
+            story_service = StoryMessagingService(page)
 
-        if profile["is_public"] and profile["can_dm"]:
-            status = dm_service.send_message("Hello how are you?")  # Pass username
-        elif profile["has_story"]:
-            status = story_service.reply_to_story("Hey, saw your story!")  # Pass username
-        else:
-            status = "No message sent"
+            profile = await profile_service.check_profile(username)
 
-        results.append({"username": username, "status": status})
+            if profile["is_public"] and profile["can_dm"]:
+                status = await dm_service.send_message(MESSAGE)
+                sent_via = "DM"
+            elif profile["has_story"]:
+                status = await story_service.reply_to_story(MESSAGE)
+                sent_via = "Story"
+            else:
+                status = False
+                sent_via = None
 
-    login_service.close()  # Close browser after all users
+            influencer.message_status = status
+            influencer.sent_via = sent_via
+            db.add(influencer)
 
-    return {"results": results}
+            results.append({"username": username, "status": status, "sent_via": sent_via})
+
+            delay = random.uniform(90, 200)
+            print(f"Sleeping for {delay:.2f} seconds...")
+            await asyncio.sleep(delay)
+
+        db.commit()
+        return {"results": results}

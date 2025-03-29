@@ -18,18 +18,18 @@ app = FastAPI(lifespan=lifespan)
 
 
 # Allow requests from your Next.js frontend
-# origins = [
-#     "http://localhost:3000",  # Next.js Dev
-#     "http://127.0.0.1:3000",
-# ]
+origins = [
+    "http://localhost:3000",  # Next.js Dev
+    "http://127.0.0.1:3000",
+]
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,  # Allows only specified frontend URLs
-#     allow_credentials=True,
-#     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
-#     allow_headers=["*"],  # Allows all headers
-# )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allows only specified frontend URLs
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 app.include_router(instagram_router)
