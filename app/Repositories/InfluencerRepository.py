@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from app.Models.Influencer import Influencer
 from app.Schemas.influencer import InfluencerCreate
+from app.Models.Client import Client 
+from sqlalchemy import desc
 
 class InfluencerRepository:
     def __init__(self, db: Session):
@@ -14,11 +16,31 @@ class InfluencerRepository:
         return db_influencer
 
     def get_influencer(self, influencer_id: int):
-        return self.db.query(Influencer).filter(Influencer.id == influencer_id).first()
+        return self.db.query(Influencer)\
+            .options(joinedload(Influencer.client))\
+            .filter(Influencer.id == influencer_id)\
+            .first()
 
     def get_influencers(self, skip: int, limit: int):
-        influencers = self.db.query(Influencer).offset(skip).limit(limit).all()
-        total_count = self.db.query(Influencer).count()
+        # Query with join to get client name and order by descending ID
+        query = self.db.query(
+            Influencer,
+            Client.name.label('client_name')
+        ).join(
+            Client,
+            Influencer.client_id == Client.id
+        ).order_by(desc(Influencer.id))
+        
+        total_count = query.count()
+        results = query.offset(skip).limit(limit).all()
+        
+        # Combine influencer with client name
+        influencers = []
+        for influencer, client_name in results:
+            influencer_dict = influencer.__dict__
+            influencer_dict['client_name'] = client_name
+            influencers.append(influencer_dict)
+        
         return influencers, total_count
 
     def update_influencer(self, influencer_id: int, influencer: InfluencerCreate):

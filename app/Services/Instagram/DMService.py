@@ -37,13 +37,13 @@ class DMService:
 
             await text_input.press("Enter")
             await self.page.wait_for_timeout(5000)
-
+            print("✅ Message sent via DM.")
             return True
             # return "✅ DM Sent"
         
         except PlaywrightTimeoutError:
-            # return "⚠️ Timeout while interacting with the DM modal."
             return False
+            # return "⚠️ Timeout while interacting with the DM modal."
         except Exception as e:
             return False
             # return f"⚠️ DM Not Sent: {str(e)}"
