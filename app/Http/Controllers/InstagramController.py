@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.Services.Instagram.LoginService import LoginService
 from app.Services.Instagram.ProfileAnalysisService import ProfileAnalysisService
@@ -7,6 +8,9 @@ from app.Services.Instagram.StoryMessagingService import StoryMessagingService
 from config.settings import INSTAGRAM_URL
 from config.database import SessionLocal
 from app.Models.Influencer import Influencer
+import random
+import asyncio
+import datetime
 
 router = APIRouter()
 
@@ -18,38 +22,68 @@ def get_db():
         db.close()
 
 @router.post("/send-messages")
-def send_messages(db: Session = Depends(get_db)):
-    # Retrieve all influencers from the database
-    influencers = db.query(Influencer).all()
-    usernames = [influencer.username for influencer in influencers]
-    print(f"Usernamesss: {usernames}")
-    if not usernames:
+async def send_messages(db: Session = Depends(get_db)):
+    # influencers = db.query(Influencer).filter(Influencer.message_status == False).all()
+    influencers = db.query(Influencer)\
+        .filter(Influencer.client_id == 1)\
+        .filter(Influencer.message_status == False)\
+        .filter(Influencer.error_code == 'STORY_NOT_FOUND')\
+        .order_by(desc(Influencer.id))\
+        .all()
+    
+    if not influencers:
         return {"message": "No influencers found to send messages."}
+    
+    async with LoginService() as login_service:
+        page = await login_service.login()
 
-    login_service = LoginService()
-    page = login_service.login()  # Login once, session persists
+        MESSAGE = """Hello,\n\nI’m Sarah from Echooo.AI, an Influencer Management Platform working with brands like Nestlé, Packages Group, Sutas Dairy, HerBeauty, Moyuum, and Fasset across Pakistan and the MENA region.\n\nNestlé is looking for influencers to help create awareness about child malnutrition in Pakistan through a paid collaboration. The scope includes:\n\n\u2022  1 Instagram Reel or YouTube Video (platform based on preference)\n\u2022  3–4 Instagram Stories or 1–2 YouTube Shorts\n\u2022  Cross-posting on all your social media handles\n\nPayment: Processed within 30–45 days after content goes live (15% platform fee applies).\n\nIf interested, please share your charges, availability, and social media URLs.\n\nLooking forward to your response!\n\nBest,\nSarah\nEchooo.AI"""
 
-    results = []
-    for username in usernames:
-        print(f"🔹 Visiting profile: {username}")
-        page.goto(f"{INSTAGRAM_URL}/{username}/")
-        page.wait_for_timeout(5000)  # Ensure page loads
+        results = []
+        # print(f"influencers:", influencers)
+        for influencer in influencers:
+            username = influencer.username
+            print(f"🔹 Visiting profile: {username}")
+            await page.goto(f"{INSTAGRAM_URL}/{username}/")
+            await asyncio.sleep(5)
 
-        profile_service = ProfileAnalysisService(page)
-        dm_service = DMService(page)
-        story_service = StoryMessagingService(page)
+            # Check if the page contains "Profile isn't available"
+            profile_unavailable = await page.evaluate("document.body.innerText.includes('Profile isn\\'t available')")
 
-        profile = profile_service.check_profile(username)
+            if profile_unavailable:
+                status, error_code, error_reason = False, "PROFILE_NOT_FOUND", "Instagram profile does not exist or is restricted"
+                sent_via = None
+                sent_at = None
+            else:
 
-        if profile["is_public"] and profile["can_dm"]:
-            status = dm_service.send_message("Hello how are you?")  # Pass username
-        elif profile["has_story"]:
-            status = story_service.reply_to_story("Hey, saw your story!")  # Pass username
-        else:
-            status = "No message sent"
+                profile_service = ProfileAnalysisService(page)
 
-        results.append({"username": username, "status": status})
+                dm_service = DMService(page)
+                story_service = StoryMessagingService(page)
 
-    login_service.close()  # Close browser after all users
+                profile = await profile_service.check_profile(username)
 
-    return {"results": results}
+                if profile["has_story"]:
+                    status, error_code, error_reason = await story_service.reply_to_story(MESSAGE)
+                    sent_via = "Story" if status else None
+                    sent_at = datetime.datetime.now().isoformat() if status else None
+                else:
+                    status, error_code, error_reason = False, "STORY_NOT_FOUND", "No active story"
+                    sent_via = None
+                    sent_at = None
+
+            influencer.message_status = status
+            influencer.sent_via = sent_via
+            influencer.error_code = error_code
+            influencer.error_reason = error_reason
+            influencer.message_sent_at = sent_at
+            
+            db.add(influencer)
+
+            results.append({"username": username, "status": status, "sent_via": sent_via, "error_code": error_code, "error_reason": error_reason})
+            db.commit()
+            delay = random.uniform(90, 200)
+            print(f"Sleeping for {delay:.2f} seconds...")
+            await asyncio.sleep(delay)
+  
+        return {"results": results}

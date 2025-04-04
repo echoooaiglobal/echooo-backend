@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = "postgresql://postgres:alee123@localhost:5432/echooo_bot"
+DATABASE_URL = "postgresql://postgres:echooo123@localhost:5432/echooo_bot"
 
 # Instagram Credentials
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")

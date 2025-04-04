@@ -10,9 +10,13 @@ class InfluencerService:
         return self.influencer_repo.create_influencer(influencer)
 
     def get_influencer(self, influencer_id: int):
-        return self.influencer_repo.get_influencer(influencer_id)
+        influencer = self.influencer_repo.get_influencer(influencer_id)
+        if influencer and influencer.client:
+            influencer.client_name = influencer.client.name
+        return influencer
 
     def get_influencers(self, skip: int = 0, limit: int = 10):
+        # The repository now returns influencers with client_name
         return self.influencer_repo.get_influencers(skip, limit)
 
     def update_influencer(self, influencer_id: int, influencer: InfluencerCreate):

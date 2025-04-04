@@ -1,33 +1,43 @@
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
 class StoryMessagingService:
-    def __init__(self, page):
+    def __init__(self, page: Page):
         self.page = page
 
-    def reply_to_story(self, message):
+    async def reply_to_story(self, message: str):
         try:
-            # Wait for the story ring to be visible and click it
             story_locator = self.page.locator("xpath=//div[@role='button' and .//img[contains(@alt, 'profile picture')]]")
-            story_locator.click()
-            self.page.wait_for_timeout(3000)  # Wait for the story to load
+            await story_locator.click()
+            await self.page.wait_for_timeout(3000)
 
-            # Wait for the message input area to be visible and click it
             message_input = self.page.locator("xpath=//textarea[contains(@placeholder, 'Reply to')]")
-            message_input.click()
-            self.page.wait_for_timeout(1000)  # Wait for the input to be focused
+            
+            if await message_input.count() == 0:
+                print("⚠️ Reply box not found. Replies might be restricted.")
+                return False, "REPLY_BOX_NOT_FOUND", "Replies Restricted"
+                
+            await message_input.click()
+            await self.page.wait_for_timeout(1000)
 
-            # Type the message character by character (simulate human typing)
-            for char in message:
-                message_input.type(char, delay=20)  # Delay of 20ms between keystrokes
-            self.page.wait_for_timeout(1000)
+            await message_input.fill(message)
+            await self.page.wait_for_timeout(1000)
 
-            # Press Enter to send the message
-            message_input.press("Enter")
-            self.page.wait_for_timeout(5000)  # Wait for the message to send
+            async with self.page.expect_response(lambda response: '/api/v1/direct_v2/threads/broadcast/reel_share/' in response.url) as response_info:
+                await message_input.press("Enter")
+                await self.page.wait_for_timeout(5000)
 
-            return "✅ Story Message Sent"
-        
+            response = await response_info.value
+
+            if response.status == 200:
+                print("✅ Story reply sent successfully.")
+                return True, None, None  # No error
+            else:
+                print(f"⚠️ Failed to send story reply. Status code: {response.status}")
+                return False, str(response.status), "Story Restriction" if response.status == 403 else "Restriction"
+
         except PlaywrightTimeoutError:
-            return "⚠️ Timeout while interacting with the story."
+            print("⚠️ Timeout while interacting with the story.")
+            return False, "TIMEOUT_ERROR", "Story Restriction"
         except Exception as e:
-            return f"⚠️ Story Message Not Sent: {str(e)}"
+            print(f"⚠️ An error occurred: {str(e)}")
+            return False, "UNKNOWN_ERROR", "Restriction"
