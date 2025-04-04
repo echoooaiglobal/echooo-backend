@@ -21,13 +21,25 @@ def read_influencer(influencer_id: int, influencer_service: InfluencerService = 
     return db_influencer
 
 @router.get("/", response_model=dict)
-def read_influencers(skip: int = 0, limit: int = 10, influencer_service: InfluencerService = Depends(get_influencer_service)):
+def read_influencers(
+    page: int = 1,  # Changed from skip to page (default 1)
+    limit: int = 10, 
+    influencer_service: InfluencerService = Depends(get_influencer_service)
+):
+    # Calculate skip offset
+    skip = (page - 1) * limit
+    
     influencers, total_count = influencer_service.get_influencers(skip, limit)
     
     # Convert ORM models to Pydantic schema
     influencers_data = [Influencer.model_validate(i) for i in influencers]
     
-    return {"influencers": influencers_data, "total_count": total_count}
+    return {
+        "influencers": influencers_data, 
+        "total_count": total_count,
+        "page": page,  # Add current page for reference
+        "limit": limit  # Add limit for reference
+    }
 
 @router.put("/{influencer_id}", response_model=Influencer)
 def update_influencer(influencer_id: int, influencer: InfluencerCreate, influencer_service: InfluencerService = Depends(get_influencer_service)):
