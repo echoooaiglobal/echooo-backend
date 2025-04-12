@@ -7,6 +7,7 @@ class Influencer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, index=True)
+    name = Column(String, nullable=True)
     client_id = Column(Integer, ForeignKey('clients.id'))
     sent_via = Column(String, default='None')
     message_status = Column(Boolean, default=False)

@@ -1,3 +1,4 @@
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from app.Models.Influencer import Influencer
 from app.Schemas.influencer import InfluencerCreate
@@ -14,6 +15,18 @@ class InfluencerRepository:
         self.db.commit()
         self.db.refresh(db_influencer)
         return db_influencer
+    
+    def bulk_create_influencers(self, influencers: list[dict], batch_size=10):
+        created = []
+        for i in range(0, len(influencers), batch_size):
+            batch = influencers[i:i + batch_size]
+            db_influencers = [Influencer(**data) for data in batch]
+            self.db.add_all(db_influencers)
+            self.db.commit()
+            created.extend(db_influencers)
+        return created  # Make sure you return something!
+
+
 
     def get_influencer(self, influencer_id: int):
         return self.db.query(Influencer)\
