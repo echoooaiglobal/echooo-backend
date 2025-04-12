@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from app.Services.InfluencerService import InfluencerService
 from app.Schemas.influencer import InfluencerCreate, Influencer
 from config.database import get_db
+from pathlib import Path
+import os
+import uuid
+from fastapi import Form
 
 router = APIRouter()
 
@@ -13,6 +17,39 @@ def get_influencer_service(db: Session = Depends(get_db)):
 def create_influencer(influencer: InfluencerCreate, influencer_service: InfluencerService = Depends(get_influencer_service)):
     return influencer_service.create_influencer(influencer)
 
+@router.post("/bulk-import")
+async def bulk_upload_influencers(
+        file: UploadFile = File(...),
+        client_id: int = Form(...),
+        db=Depends(get_db)
+    ):
+    try:
+        # Define temp directory
+        temp_dir = Path("storage/tmp")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Construct safe temp filename
+        file_ext = file.filename.split(".")[-1]
+        temp_filename = temp_dir / f"influencers_{uuid.uuid4()}.{file_ext}"
+
+        # Save uploaded file
+        with open(temp_filename, "wb") as f:
+            f.write(await file.read())
+
+        # Process the Excel
+        service = InfluencerService(db)
+        created = service.bulk_create_influencers_from_excel(str(temp_filename), client_id)
+
+        # Delete temp file
+        os.remove(temp_filename)
+
+        return {
+            "message": f"{len(created)} influencers created successfully.",
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.get("/{influencer_id}", response_model=Influencer)
 def read_influencer(influencer_id: int, influencer_service: InfluencerService = Depends(get_influencer_service)):
     db_influencer = influencer_service.get_influencer(influencer_id)
