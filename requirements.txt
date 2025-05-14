@@ -9,3 +9,6 @@ fastapi-users
 pandas
 openpyxl
 celery
+jwt
+python-jose
+passlib

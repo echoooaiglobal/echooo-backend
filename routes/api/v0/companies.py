@@ -1,13 +1,9 @@
 # routes/api/v0/clients.py
 from fastapi import APIRouter
-from app.Http.Controllers import ClientController
-router = APIRouter()
-router.include_router(ClientController.router, prefix="/clients", tags=["Clients"])
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
-
 from app.Http.Controllers.CompanyController import CompanyController
 from app.Models.auth_models import User
 from app.Schemas.company import (

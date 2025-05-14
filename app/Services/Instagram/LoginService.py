@@ -3,7 +3,7 @@ import json
 import random
 from pathlib import Path
 from playwright.async_api import async_playwright
-from config.settings import INSTAGRAM_URL, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, SESSION_STORAGE_PATH
+from config.settings import settings
 
 class LoginService:
     def __init__(self):
@@ -11,14 +11,14 @@ class LoginService:
         self.browser = None
         self.context = None
         self.page = None
-        self.session_file = Path(SESSION_STORAGE_PATH)
+        self.session_file = Path(settings.SESSION_STORAGE_PATH)
 
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=True)
         self.context = await self.browser.new_context()
         self.page = await self.context.new_page()
-        await self.page.goto(INSTAGRAM_URL)
+        await self.page.goto(settings.INSTAGRAM_URL)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -34,16 +34,16 @@ class LoginService:
     async def login(self):
         if self.session_file.exists():
             await self.load_session()
-            await self.page.goto(INSTAGRAM_URL)
+            await self.page.goto(settings.INSTAGRAM_URL)
             if await self.is_logged_in():
                 return self.page
 
         # Perform login
         username_input = self.page.locator("input[name='username']")
-        await self.human_type(username_input, INSTAGRAM_USERNAME)
+        await self.human_type(username_input, settings.INSTAGRAM_USERNAME)
 
         password_input = self.page.locator("input[name='password']")
-        await self.human_type(password_input, INSTAGRAM_PASSWORD)
+        await self.human_type(password_input, settings.INSTAGRAM_PASSWORD)
 
         await self.page.click("button[type='submit']")
         await self.page.wait_for_timeout(5000)

@@ -1,28 +1,147 @@
-from pydantic import BaseModel
-from typing import Optional
+# app/Schemas/influencer.py
+from pydantic import BaseModel,ConfigDict, validator, Field
+from typing import List, Optional, Dict, Any
 from datetime import datetime
+import uuid
+
+class PlatformBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class PlatformCreate(PlatformBase):
+    pass
+
+class PlatformUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class PlatformResponse(PlatformBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    parent_id: Optional[uuid.UUID] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    parent_id: Optional[uuid.UUID] = None
+
+class CategoryResponse(CategoryBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class InfluencerContactBase(BaseModel):
+    platform_specific: bool = False
+    platform_id: Optional[uuid.UUID] = None
+    role_id: Optional[uuid.UUID] = None
+    name: Optional[str] = None
+    contact_type: str
+    contact_value: str
+    is_primary: bool = False
+
+class InfluencerContactCreate(InfluencerContactBase):
+    influencer_id: uuid.UUID
+
+class InfluencerContactUpdate(BaseModel):
+    platform_specific: Optional[bool] = None
+    platform_id: Optional[uuid.UUID] = None
+    role_id: Optional[uuid.UUID] = None
+    name: Optional[str] = None
+    contact_type: Optional[str] = None
+    contact_value: Optional[str] = None
+    is_primary: Optional[bool] = None
+
+class InfluencerContactResponse(InfluencerContactBase):
+    id: uuid.UUID
+    influencer_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class InfluencerSocialAccountBase(BaseModel):
+    platform_id: uuid.UUID
+    platform_account_id: str
+    account_handle: str
+    full_name: str
+    profile_pic_url: Optional[str] = None
+    profile_pic_url_hd: Optional[str] = None
+    account_url: Optional[str] = None
+    is_private: bool = False
+    is_verified: bool = False
+    is_business: bool = False
+    media_count: Optional[int] = None
+    followers_count: Optional[int] = None
+    following_count: Optional[int] = None
+    subscribers_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    biography: Optional[str] = None
+    has_highlight_reels: bool = False
+    category_id: Optional[uuid.UUID] = None
+    has_clips: bool = False
+    additional_metrics: Optional[Dict[str, Any]] = None
+
+class InfluencerSocialAccountCreate(InfluencerSocialAccountBase):
+    influencer_id: uuid.UUID
+
+class InfluencerSocialAccountUpdate(BaseModel):
+    platform_account_id: Optional[str] = None
+    account_handle: Optional[str] = None
+    full_name: Optional[str] = None
+    profile_pic_url: Optional[str] = None
+    profile_pic_url_hd: Optional[str] = None
+    account_url: Optional[str] = None
+    is_private: Optional[bool] = None
+    is_verified: Optional[bool] = None
+    is_business: Optional[bool] = None
+    media_count: Optional[int] = None
+    followers_count: Optional[int] = None
+    following_count: Optional[int] = None
+    subscribers_count: Optional[int] = None
+    likes_count: Optional[int] = None
+    biography: Optional[str] = None
+    has_highlight_reels: Optional[bool] = None
+    category_id: Optional[uuid.UUID] = None
+    has_clips: Optional[bool] = None
+    additional_metrics: Optional[Dict[str, Any]] = None
+
+class InfluencerSocialAccountResponse(InfluencerSocialAccountBase):
+    id: uuid.UUID
+    influencer_id: uuid.UUID
+    platform: PlatformResponse
+    category: Optional[CategoryResponse] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 class InfluencerBase(BaseModel):
-    username: str
-    client_id: int
-    name: Optional[str] = None
-    sent_via: Optional[str] = None 
-    message_status: Optional[bool] = False
-    error_code: Optional[str] = None
-    error_reason: Optional[str] = None
-    message_sent_at: Optional[datetime] = None
+    user_id: Optional[uuid.UUID] = None
 
 class InfluencerCreate(InfluencerBase):
     pass
 
-class Influencer(InfluencerBase):
-    id: int
-    client_name: Optional[str]  # Optional client_name field
+class InfluencerUpdate(BaseModel):
+    user_id: Optional[uuid.UUID] = None
 
-    class Config:
-        orm_mode = True
-        from_attributes = True
+class InfluencerResponse(InfluencerBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    social_accounts: List[InfluencerSocialAccountResponse] = []
+    contacts: List[InfluencerContactResponse] = []
 
-class BulkInfluencerSchema(BaseModel):
-    name: str
-    username: str
+    model_config = ConfigDict(from_attributes=True)

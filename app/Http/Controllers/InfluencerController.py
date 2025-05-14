@@ -1,93 +1,193 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+# app/Http/Controllers/InfluencerController.py
+from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from app.Services.InfluencerService import InfluencerService
-from app.Schemas.influencer import InfluencerCreate, Influencer
-from config.database import get_db
-from pathlib import Path
-import os
+from typing import List, Dict, Any
 import uuid
-from fastapi import Form
 
-router = APIRouter()
+from app.Models.auth_models import User
+from app.Models.influencer_models import Influencer, InfluencerSocialAccount, InfluencerContact
+from app.Schemas.influencer import (
+    InfluencerCreate, InfluencerUpdate, InfluencerResponse,
+    InfluencerSocialAccountCreate, InfluencerSocialAccountUpdate, InfluencerSocialAccountResponse,
+    InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse
+)
+from app.Services.InfluencerService import InfluencerService
+from app.Utils.Logger import logger
 
-def get_influencer_service(db: Session = Depends(get_db)):
-    return InfluencerService(db)
-
-@router.post("/", response_model=Influencer)
-def create_influencer(influencer: InfluencerCreate, influencer_service: InfluencerService = Depends(get_influencer_service)):
-    return influencer_service.create_influencer(influencer)
-
-@router.post("/bulk-import")
-async def bulk_upload_influencers(
-        file: UploadFile = File(...),
-        client_id: int = Form(...),
-        db=Depends(get_db)
+class InfluencerController:
+    """Controller for influencer-related endpoints"""
+    
+    @staticmethod
+    async def create_influencer(
+        influencer_data: InfluencerCreate,
+        db: Session
     ):
-    try:
-        # Define temp directory
-        temp_dir = Path("storage/tmp")
-        temp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Construct safe temp filename
-        file_ext = file.filename.split(".")[-1]
-        temp_filename = temp_dir / f"influencers_{uuid.uuid4()}.{file_ext}"
-
-        # Save uploaded file
-        with open(temp_filename, "wb") as f:
-            f.write(await file.read())
-
-        # Process the Excel
-        service = InfluencerService(db)
-        created = service.bulk_create_influencers_from_excel(str(temp_filename), client_id)
-
-        # Delete temp file
-        os.remove(temp_filename)
-
-        return {
-            "message": f"{len(created)} influencers created successfully.",
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        """Create a new influencer profile"""
+        try:
+            influencer = await InfluencerService.create_influencer_profile(
+                influencer_data.user_id,
+                db
+            )
+            return InfluencerResponse.from_orm(influencer)
+        except Exception as e:
+            logger.error(f"Error in create_influencer controller: {str(e)}")
+            raise
     
-@router.get("/{influencer_id}", response_model=Influencer)
-def read_influencer(influencer_id: int, influencer_service: InfluencerService = Depends(get_influencer_service)):
-    db_influencer = influencer_service.get_influencer(influencer_id)
-    if db_influencer is None:
-        raise HTTPException(status_code=404, detail="Influencer not found")
-    return db_influencer
-
-@router.get("/", response_model=dict)
-def read_influencers(
-    page: int = 1,  # Changed from skip to page (default 1)
-    limit: int = 10, 
-    influencer_service: InfluencerService = Depends(get_influencer_service)
-):
-    # Calculate skip offset
-    skip = (page - 1) * limit
+    @staticmethod
+    async def get_influencer(
+        influencer_id: uuid.UUID,
+        db: Session
+    ):
+        """Get an influencer by ID"""
+        try:
+            influencer = await InfluencerService.get_influencer_by_id(influencer_id, db)
+            return InfluencerResponse.from_orm(influencer)
+        except Exception as e:
+            logger.error(f"Error in get_influencer controller: {str(e)}")
+            raise
     
-    influencers, total_count = influencer_service.get_influencers(skip, limit)
+    @staticmethod
+    async def get_influencer_by_user(
+        user_id: uuid.UUID,
+        db: Session
+    ):
+        """Get an influencer by user ID"""
+        try:
+            influencer = await InfluencerService.get_influencer_by_user_id(user_id, db)
+            return InfluencerResponse.from_orm(influencer)
+        except Exception as e:
+            logger.error(f"Error in get_influencer_by_user controller: {str(e)}")
+            raise
     
-    # Convert ORM models to Pydantic schema
-    influencers_data = [Influencer.model_validate(i) for i in influencers]
+    @staticmethod
+    async def update_influencer(
+        influencer_id: uuid.UUID,
+        influencer_data: InfluencerUpdate,
+        db: Session
+    ):
+        """Update an influencer profile"""
+        try:
+            influencer = await InfluencerService.update_influencer(
+                influencer_id,
+                influencer_data.dict(exclude_unset=True),
+                db
+            )
+            return InfluencerResponse.from_orm(influencer)
+        except Exception as e:
+            logger.error(f"Error in update_influencer controller: {str(e)}")
+            raise
     
-    return {
-        "influencers": influencers_data, 
-        "total_count": total_count,
-        "page": page,  # Add current page for reference
-        "limit": limit  # Add limit for reference
-    }
-
-@router.put("/{influencer_id}", response_model=Influencer)
-def update_influencer(influencer_id: int, influencer: InfluencerCreate, influencer_service: InfluencerService = Depends(get_influencer_service)):
-    db_influencer = influencer_service.update_influencer(influencer_id, influencer)
-    if db_influencer is None:
-        raise HTTPException(status_code=404, detail="Influencer not found")
-    return db_influencer
-
-@router.delete("/{influencer_id}", response_model=Influencer)
-def delete_influencer(influencer_id: int, influencer_service: InfluencerService = Depends(get_influencer_service)):
-    db_influencer = influencer_service.delete_influencer(influencer_id)
-    if db_influencer is None:
-        raise HTTPException(status_code=404, detail="Influencer not found")
-    return db_influencer
+    @staticmethod
+    async def delete_influencer(
+        influencer_id: uuid.UUID,
+        db: Session
+    ):
+        """Delete an influencer profile"""
+        try:
+            await InfluencerService.delete_influencer(influencer_id, db)
+            return {"message": "Influencer profile deleted successfully"}
+        except Exception as e:
+            logger.error(f"Error in delete_influencer controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def add_social_account(
+        influencer_id: uuid.UUID,
+        account_data: InfluencerSocialAccountCreate,
+        db: Session
+    ):
+        """Add a social account to an influencer"""
+        try:
+            account_data_dict = account_data.dict()
+            account_data_dict['influencer_id'] = influencer_id
+            social_account = await InfluencerService.add_social_account(
+                influencer_id,
+                account_data_dict,
+                db
+            )
+            return InfluencerSocialAccountResponse.from_orm(social_account)
+        except Exception as e:
+            logger.error(f"Error in add_social_account controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def update_social_account(
+        account_id: uuid.UUID,
+        account_data: InfluencerSocialAccountUpdate,
+        db: Session
+    ):
+        """Update an influencer's social account"""
+        try:
+            social_account = await InfluencerService.update_social_account(
+                account_id,
+                account_data.dict(exclude_unset=True),
+                db
+            )
+            return InfluencerSocialAccountResponse.from_orm(social_account)
+        except Exception as e:
+            logger.error(f"Error in update_social_account controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def delete_social_account(
+        account_id: uuid.UUID,
+        db: Session
+    ):
+        """Delete an influencer's social account"""
+        try:
+            await InfluencerService.delete_social_account(account_id, db)
+            return {"message": "Social account deleted successfully"}
+        except Exception as e:
+            logger.error(f"Error in delete_social_account controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def add_influencer_contact(
+        influencer_id: uuid.UUID,
+        contact_data: InfluencerContactCreate,
+        db: Session
+    ):
+        """Add a contact to an influencer"""
+        try:
+            contact_data_dict = contact_data.dict()
+            contact_data_dict['influencer_id'] = influencer_id
+            contact = await InfluencerService.add_contact(
+                influencer_id,
+                contact_data_dict,
+                db
+            )
+            return InfluencerContactResponse.from_orm(contact)
+        except Exception as e:
+            logger.error(f"Error in add_influencer_contact controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def update_influencer_contact(
+        contact_id: uuid.UUID,
+        contact_data: InfluencerContactUpdate,
+        db: Session
+    ):
+        """Update an influencer contact"""
+        try:
+            contact = await InfluencerService.update_contact(
+                contact_id,
+                contact_data.dict(exclude_unset=True),
+                db
+            )
+            return InfluencerContactResponse.from_orm(contact)
+        except Exception as e:
+            logger.error(f"Error in update_influencer_contact controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def delete_influencer_contact(
+        contact_id: uuid.UUID,
+        db: Session
+    ):
+        """Delete an influencer contact"""
+        try:
+            await InfluencerService.delete_contact(contact_id, db)
+            return {"message": "Influencer contact deleted successfully"}
+        except Exception as e:
+            logger.error(f"Error in delete_influencer_contact controller: {str(e)}")
+            raise
