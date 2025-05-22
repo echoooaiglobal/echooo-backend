@@ -1,4 +1,4 @@
-from config.settings import INSTAGRAM_URL
+from config.settings import settings
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 class ProfileAnalysisService:

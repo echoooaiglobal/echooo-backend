@@ -3,7 +3,7 @@ import asyncio
 import random
 from typing import List, Dict, Any, Optional, Tuple
 from app.Services.Utils.RandomizationUtil import RandomizationUtil
-from config.settings import INSTAGRAM_URL
+from config.settings import settings
 from urllib.parse import urlparse
 
 class BrowsingService:
@@ -36,7 +36,7 @@ class BrowsingService:
         def normalize_url(url: str) -> str:
             return urlparse(url).path.rstrip('/')
         try:
-            profile_url = f"{INSTAGRAM_URL}/{username}/"
+            profile_url = f"{settings.INSTAGRAM_URL}/{username}/"
             current_url = self.page.url
             
             # Only navigate if we're not already on the profile

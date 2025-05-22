@@ -12,7 +12,7 @@ from app.Services.Instagram.HighlightMessagingService import HighlightMessagingS
 from app.Services.Instagram.StoryMessagingService import StoryMessagingService
 from app.Services.Instagram.DMService import DMService
 from app.Services.Instagram.ProfileAnalysisService import ProfileAnalysisService
-from config.settings import INSTAGRAM_URL
+from config.settings import settings
 
 class HumanSimulationService:
     """
@@ -1091,7 +1091,7 @@ class HumanSimulationService:
             Boolean indicating success
         """
         try:
-            profile_url = f"{INSTAGRAM_URL}/{username}/"
+            profile_url = f"{settings.INSTAGRAM_URL}/{username}/"
             current_url = self.page.url
             
             # Only navigate if we're not already on the profile

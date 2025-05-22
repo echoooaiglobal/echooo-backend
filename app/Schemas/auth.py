@@ -1,0 +1,245 @@
+# app/Schemas/auth.py
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, validator, root_validator
+import uuid
+from typing import List, Optional
+from datetime import datetime
+import re
+import pydantic
+from packaging import version
+PYDANTIC_V2 = version.parse(pydantic.__version__) >= version.parse("2.0.0")
+
+if PYDANTIC_V2:
+    from pydantic import field_validator
+else:
+    from pydantic import validator
+
+class TokenData(BaseModel):
+    email: Optional[str] = None   
+    user_id: Optional[str] = None
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+
+class RoleResponse(BaseModel):
+    id: str  # Change from int to str to handle UUID
+    name: str
+    description: Optional[str] = None
+    
+    model_config = {
+        "from_attributes": True  # For Pydantic v2 (formerly orm_mode)
+    }
+    
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+class UserBase(BaseModel):
+    email: EmailStr
+    full_name: str
+    phone_number: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8)
+    user_type: str = Field(..., pattern=r'^(platform|company|influencer)$')
+    company_id: Optional[str] = None  # Use str for UUID
+    role_name: Optional[str] = None
+
+    # Company related fields
+    company_name: Optional[str] = None
+    company_domain: Optional[str] = None
+    
+    @field_validator('password')
+    def password_strength(cls, v: str) -> str:
+        """Validate password meets complexity requirements"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one number')
+        return v
+    
+    @field_validator('user_type')
+    def validate_user_type(cls, v):
+        valid_types = ['platform', 'company', 'influencer']
+        if v not in valid_types:
+            raise ValueError(f'User type must be one of: {", ".join(valid_types)}')
+        return v
+    
+    @field_validator('company_id')
+    @classmethod
+    def validate_company_id(cls, v, info):
+        # For Pydantic v2, data is accessed through info.data
+        if 'user_type' in info.data and info.data['user_type'] == 'company' and v is None:
+            raise ValueError('Company ID is required for company users')
+        return v
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    profile_image_url: Optional[str] = None
+
+class UserResponse(BaseModel):
+    id: str
+    email: EmailStr
+    full_name: str
+    phone_number: Optional[str] = None
+    status: str
+    user_type: Optional[str] = None
+    email_verified: bool
+    profile_image_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_login_at: Optional[datetime] = None
+    
+    model_config = {
+        "from_attributes": True  # Formerly orm_mode
+    }
+    
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
+class CompanyBriefResponse(BaseModel):
+    id: str
+    name: str
+    domain: Optional[str] = None
+    created_at: datetime
+    
+    model_config = {
+        "from_attributes": True
+    }
+    
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v 
+
+class CompanyBase(BaseModel):
+    name: str
+    website: Optional[str] = None
+    industry: Optional[str] = None
+    description: Optional[str] = None
+
+class CompanyCreate(CompanyBase):
+    pass
+
+class CompanyResponse(CompanyBase):
+    id: str
+    logo_url: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {
+        "from_attributes": True  # For Pydantic v2
+    }
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+class InfluencerBase(BaseModel):
+    bio: Optional[str] = None
+    primary_platform: Optional[str] = None
+    niche: Optional[str] = None
+
+class InfluencerCreate(InfluencerBase):
+    user_id: str
+
+class InfluencerResponse(InfluencerBase):
+    id: str
+    user_id: int
+    audience_size: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {
+        "from_attributes": True  # For Pydantic v2
+    }
+
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+class SocialAccountBase(BaseModel):
+    platform: str
+    username: str
+    follower_count: Optional[int] = None
+    verified: bool = False
+
+class SocialAccountCreate(SocialAccountBase):
+    influencer_id: str
+
+class SocialAccountResponse(SocialAccountBase):
+    id: int
+    influencer_id: int
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class UserDetailResponse(UserResponse):
+    """Extended user response with additional details like company info"""
+    roles: List[RoleResponse] = []
+    company: Optional[CompanyBriefResponse] = None
+    
+    model_config = {
+        "from_attributes": True
+    }
+
+class LoginResponse(TokenResponse):
+    user: UserResponse
+    roles: List[RoleResponse]
+    refresh_token: str
+    company: Optional[CompanyBriefResponse] = None
+    
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
+    
+    @field_validator('confirm_password')
+    def passwords_match(cls, v: str, info) -> str:
+        if v != info.data.get('new_password'):
+            raise ValueError('Passwords do not match')
+        return v
+    
+    @field_validator('new_password')
+    def password_strength(cls, v: str) -> str:
+        """Validate password meets complexity requirements"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one number')
+        return v

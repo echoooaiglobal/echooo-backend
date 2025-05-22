@@ -7,9 +7,9 @@ from app.Services.Instagram.ProfileAnalysisService import ProfileAnalysisService
 from app.Services.Instagram.StoryMessagingService import StoryMessagingService
 from app.Services.Instagram.HighlightMessagingService import HighlightMessagingService
 from app.Services.Instagram.HumanSimulationService import HumanSimulationService
-from config.settings import INSTAGRAM_URL
+from config.settings import settings
 from config.database import SessionLocal
-from app.Models.Influencer import Influencer
+# from app.Models.influencer_models import Influencer
 from typing import List, Optional, Dict, Any
 import random
 import asyncio
@@ -32,12 +32,14 @@ async def send_messages(db: Session = Depends(get_db)):
     This maintains backward compatibility.
     """
     # influencers = db.query(Influencer).filter(Influencer.message_status == False).all()
-    influencers = db.query(Influencer)\
-        .filter(Influencer.client_id == 4)\
-        .filter(Influencer.message_status == False)\
-        .filter(Influencer.error_code == None)\
-        .order_by(desc(Influencer.id))\
-        .all()
+    # influencers = db.query(Influencer)\
+    #     .filter(Influencer.client_id == 4)\
+    #     .filter(Influencer.message_status == False)\
+    #     .filter(Influencer.error_code == None)\
+    #     .order_by(desc(Influencer.id))\
+    #     .all()
+
+    influencers = []
 
     # influencers = db.query(Influencer)\
     #     .filter(Influencer.client_id == 2)\
@@ -64,7 +66,7 @@ async def send_messages(db: Session = Depends(get_db)):
         for influencer in influencers:
             username = influencer.username
             print(f"🔹 Visiting profile: {username}")
-            await page.goto(f"{INSTAGRAM_URL}/{username}/")
+            await page.goto(f"{settings.INSTAGRAM_URL}/{username}/")
             await asyncio.sleep(5)
 
             # Check if the page contains "Profile isn't available"
@@ -152,13 +154,13 @@ async def send_with_human_behavior(
         behavior_type: Type of behavior pattern to use (casual_browser, power_user, etc.)
         pre_engagement_time: Time to spend browsing before sending message (in seconds)
     """
-    influencers = db.query(Influencer)\
-        .filter(Influencer.client_id == 3)\
-        .filter(Influencer.message_status == False)\
-        .filter(Influencer.error_code != '403')\
-        .order_by(desc(Influencer.id))\
-        .all()
-    
+    # influencers = db.query(Influencer)\
+    #     .filter(Influencer.client_id == 3)\
+    #     .filter(Influencer.message_status == False)\
+    #     .filter(Influencer.error_code != '403')\
+    #     .order_by(desc(Influencer.id))\
+    #     .all()
+    influencers = []
     if not influencers:
         return {"message": "No influencers found to send messages."}
     

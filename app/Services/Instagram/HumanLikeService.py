@@ -6,7 +6,7 @@ from app.Services.Instagram.DMService import DMService
 from app.Services.Instagram.ProfileAnalysisService import ProfileAnalysisService
 from app.Services.Instagram.StoryMessagingService import StoryMessagingService
 from app.Services.Instagram.HighlightMessagingService import HighlightMessagingService
-from config.settings import INSTAGRAM_URL
+from config.settings import settings
 from config.database import SessionLocal
 from app.Models.Influencer import Influencer
 import random
@@ -37,7 +37,7 @@ class HumanLikeService:
             
     async def random_explore(self):
         """Visit explore page and interact with random content"""
-        await self.page.goto(f"{INSTAGRAM_URL}/explore/")
+        await self.page.goto(f"{settings.INSTAGRAM_URL}/explore/")
         await asyncio.sleep(random.uniform(3, 7))
         await self.natural_scrolling()
         
@@ -52,7 +52,7 @@ class HumanLikeService:
                 
     async def browse_feed(self):
         """Browse home feed naturally"""
-        await self.page.goto(INSTAGRAM_URL)
+        await self.page.goto(settings.INSTAGRAM_URL)
         await asyncio.sleep(random.uniform(3, 8))
         await self.natural_scrolling(3, 12)
         
@@ -65,7 +65,7 @@ class HumanLikeService:
                 
     async def view_profile_naturally(self, username):
         """View a profile in a human-like manner"""
-        await self.page.goto(f"{INSTAGRAM_URL}/{username}/")
+        await self.page.goto(f"{settings.INSTAGRAM_URL}/{username}/")
         await asyncio.sleep(random.uniform(3, 7))
         
         # Look at profile info
