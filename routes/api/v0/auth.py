@@ -7,7 +7,7 @@ from app.Http.Controllers.AuthController import AuthController
 from app.Models.auth_models import User
 from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, RefreshTokenRequest, 
-    LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset
+    LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset, UserDetailResponse
 )
 from app.Utils.Helpers import get_current_active_user, get_current_user
 from config.database import get_db
@@ -74,10 +74,10 @@ async def reset_password(
     """Reset a user's password using a reset token"""
     return await AuthController.reset_password(reset_data, db)
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_active_user)):
-    """Get current user profile"""
-    return await AuthController.get_me(current_user)
+@router.get("/me", response_model=UserDetailResponse)
+async def get_me(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Get current user profile with additional details"""
+    return await AuthController.get_me(current_user, db)
 
 @router.put("/me", response_model=UserResponse)
 async def update_profile(

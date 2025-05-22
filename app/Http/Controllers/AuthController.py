@@ -11,8 +11,9 @@ import uuid
 from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, TokenData, 
     LoginResponse, RoleResponse, PasswordResetRequest, 
-    PasswordReset, UserUpdate
+    PasswordReset, UserUpdate, CompanyBriefResponse, UserDetailResponse
 )
+from app.Schemas.company import CompanyCreate
 from app.Models.auth_models import User, Role, RefreshToken, UserStatus
 from app.Models.company_models import Company, CompanyUser
 from app.Services.InfluencerService import InfluencerService
@@ -20,6 +21,7 @@ from config.database import get_db
 from app.Utils.Helpers import get_current_user, get_current_active_user
 from app.Utils.Logger import logger
 from config.settings import settings
+from app.Services.CompanyService import CompanyService
 
 # Configuration for JWT
 SECRET_KEY = settings.SECRET_KEY
@@ -92,7 +94,8 @@ class AuthController:
             hashed_password=AuthController.get_password_hash(user_data.password),
             full_name=user_data.full_name,
             phone_number=user_data.phone_number,
-            status=UserStatus.PENDING.value
+            status=UserStatus.PENDING.value,
+            user_type=user_data.user_type
         )
         
         # Add default role or specific role if provided
@@ -146,44 +149,88 @@ class AuthController:
         
         # Start transaction
         try:
-            # Handle company association if applicable
-            if user_data.user_type == "company" and user_data.company_id:
-                try:
-                    # Convert string to UUID
-                    company_id = uuid.UUID(user_data.company_id)
-                    company = db.query(Company).filter(Company.id == company_id).first()
-                    
-                    if not company:
+            # Different flows based on user type
+            if user_data.user_type == "platform":
+                # For platform users, just save the user
+                db.add(db_user)
+                db.commit()
+                db.refresh(db_user)
+                
+            elif user_data.user_type == "company":
+                company_id = getattr(user_data, 'company_id', None)
+                company_name = getattr(user_data, 'company_name', None)
+                
+                # First save the user to get the ID
+                db.add(db_user)
+                db.commit()
+                db.refresh(db_user)
+                
+                if company_id is not None:
+                    # User specified an existing company - associate with it
+                    try:
+                        # Convert string to UUID
+                        company_id_uuid = uuid.UUID(company_id)
+                        company = db.query(Company).filter(Company.id == company_id_uuid).first()
+                        
+                        if not company:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Company not found"
+                            )
+                        
+                        # Create association using CompanyUser model
+                        company_user = CompanyUser(
+                            company_id=company.id,
+                            user_id=db_user.id,
+                            role_id=role.id,
+                            is_primary=True
+                        )
+                        
+                        db.add(company_user)
+                        db.commit()
+                    except ValueError:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Company not found"
+                            detail="Invalid company ID format"
                         )
+                elif company_name is not None:
+                    # User wants to create a new company
+                    try:
+                        # Create company data dictionary
+                        company_data = {
+                            "name": company_name,
+                            "domain": getattr(user_data, 'company_domain', None)
+                        }
+                        
+                        # Import CompanyService if not already imported
+                        from app.Services.CompanyService import CompanyService
+                        
+                        # Create a new company
+                        company = await CompanyService.create_company(
+                            company_data,
+                            db_user.id,
+                            db
+                        )
+                        
+                    except Exception as e:
+                        # If company creation fails, rollback and report error
+                        logger.error(f"Error creating company during registration: {str(e)}")
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Error creating company: {str(e)}"
+                        )
+                # If neither company_id nor company_name provided, user will be created
+                # without a company association
                     
-                    # First save the user to get the ID
-                    db.add(db_user)
-                    db.commit()
-                    db.refresh(db_user)
-
-                    # Create association using CompanyUser model
-                    company_user = CompanyUser(
-                        company_id=company.id,
-                        user_id=db_user.id,
-                        role_id=role.id,
-                        is_primary=True  # Mark as primary if it's the first user for this company
-                    )
-                    
-                    db.add(company_user)
-                    db.commit()
-                except ValueError:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid company ID format"
-                    )
-            
-            # Create associated profiles based on user type
-            if user_data.user_type == "influencer":
+            elif user_data.user_type == "influencer":
+                # For influencers, create user and influencer profile
+                db.add(db_user)
+                db.commit()
+                db.refresh(db_user)
+                
+                # Create influencer profile
                 await InfluencerService.create_influencer_profile(db_user.id, db)
-            
+                
             # Return the user
             return UserResponse.model_validate(db_user)
         except Exception as e:
@@ -210,7 +257,8 @@ class AuthController:
             full_name=user_data.full_name,
             phone_number=user_data.phone_number,
             status=UserStatus.ACTIVE.value,  # Active immediately
-            email_verified=True  # Verified immediately
+            email_verified=True,  # Verified immediately
+            user_type="platform"
         )
         
         # Add platform_admin role
@@ -278,14 +326,23 @@ class AuthController:
         # Get user roles
         roles = [RoleResponse.from_orm(role) for role in user.roles]
         
+        # Get company info if user is a company user
+        company = None
+        if user.user_type == "company":
+            # Find the company through CompanyUser association
+            company_user = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
+            if company_user:
+                company = db.query(Company).filter(Company.id == company_user.company_id).first()
+        
         # Return tokens and user info
         return LoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user=UserResponse.from_orm(user),
-            roles=roles
+            user=UserResponse.model_validate(user),
+            roles=roles,
+            company=CompanyBriefResponse.model_validate(company) if company else None
         )
     
     @staticmethod
@@ -389,9 +446,26 @@ class AuthController:
         return {"message": "Password has been reset successfully"}
     
     @staticmethod
-    async def get_me(current_user: User = Depends(get_current_active_user)):
-        """Get current user profile"""
-        return UserResponse.from_orm(current_user)
+    async def get_me(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+        """Get current user profile with additional details"""
+        # Get user roles
+        roles = [RoleResponse.model_validate(role) for role in current_user.roles]
+        
+        # Get company info if user is a company user
+        company = None
+        if current_user.user_type == "company":
+            # Find the company through CompanyUser association
+            company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
+            if company_user:
+                company = db.query(Company).filter(Company.id == company_user.company_id).first()
+        
+        # Create response with company info
+        response = UserDetailResponse.model_validate(current_user)
+        response.roles = roles
+        if company:
+            response.company = CompanyBriefResponse.model_validate(company)
+        
+        return response
     
     @staticmethod
     async def update_profile(user_data: UserUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):

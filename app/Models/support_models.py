@@ -16,7 +16,9 @@ class Platform(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    social_accounts = relationship("InfluencerSocialAccount", back_populates="platform")
+    social_accounts = relationship("SocialAccount", back_populates="platform")
+    # Add this relationship to match the one in Agent model
+    agents = relationship("Agent", back_populates="platform")
 
 class Category(Base):
     __tablename__ = 'categories'
@@ -32,4 +34,4 @@ class Category(Base):
     parent = relationship("Category", remote_side=[id], backref="subcategories")
     
     # Relationships
-    social_accounts = relationship("InfluencerSocialAccount", back_populates="category")
+    social_accounts = relationship("SocialAccount", back_populates="category")

@@ -5,10 +5,10 @@ from typing import List, Dict, Any
 import uuid
 
 from app.Models.auth_models import User
-from app.Models.influencer_models import Influencer, InfluencerSocialAccount, InfluencerContact
+from app.Models.influencer_models import Influencer, SocialAccount, InfluencerContact
 from app.Schemas.influencer import (
     InfluencerCreate, InfluencerUpdate, InfluencerResponse,
-    InfluencerSocialAccountCreate, InfluencerSocialAccountUpdate, InfluencerSocialAccountResponse,
+    SocialAccountCreate, SocialAccountUpdate, SocialAccountResponse,
     InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse
 )
 from app.Services.InfluencerService import InfluencerService
@@ -93,7 +93,7 @@ class InfluencerController:
     @staticmethod
     async def add_social_account(
         influencer_id: uuid.UUID,
-        account_data: InfluencerSocialAccountCreate,
+        account_data: SocialAccountCreate,
         db: Session
     ):
         """Add a social account to an influencer"""
@@ -105,7 +105,7 @@ class InfluencerController:
                 account_data_dict,
                 db
             )
-            return InfluencerSocialAccountResponse.from_orm(social_account)
+            return SocialAccountResponse.from_orm(social_account)
         except Exception as e:
             logger.error(f"Error in add_social_account controller: {str(e)}")
             raise
@@ -113,7 +113,7 @@ class InfluencerController:
     @staticmethod
     async def update_social_account(
         account_id: uuid.UUID,
-        account_data: InfluencerSocialAccountUpdate,
+        account_data: SocialAccountUpdate,
         db: Session
     ):
         """Update an influencer's social account"""
@@ -123,7 +123,7 @@ class InfluencerController:
                 account_data.dict(exclude_unset=True),
                 db
             )
-            return InfluencerSocialAccountResponse.from_orm(social_account)
+            return SocialAccountResponse.from_orm(social_account)
         except Exception as e:
             logger.error(f"Error in update_social_account controller: {str(e)}")
             raise

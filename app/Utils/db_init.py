@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.Utils.Logger import logger
 from app.Models import (
     User, Role, Permission, RolePermission,
-    Platform, Category, UserStatus, user_roles
+    Platform, Category, UserStatus, user_roles, Status, MessageChannel
 )
 
 def initialize_default_roles_permissions(db: Session):
@@ -16,15 +16,13 @@ def initialize_default_roles_permissions(db: Session):
     try:
         # Create default roles if they don't exist
         default_roles = [
-            # Existing roles
-            {"name": "platform_admin", "description": "Platform administrator with full access"},
-            {"name": "platform_user", "description": "Platform staff member"},
-            {"name": "company_admin", "description": "Company administrator"},
-            {"name": "company_user", "description": "Company user"},
+            # influencer-specific roles
             {"name": "influencer", "description": "Influencer user"},
             {"name": "influencer_manager", "description": "Influencer manager"},
             
-            # New platform-specific roles
+            # platform-specific roles
+            {"name": "platform_admin", "description": "Platform administrator with full access"},
+            {"name": "platform_user", "description": "Platform staff member"},
             {"name": "platform_manager", "description": "Platform manager with oversight across functions"},
             {"name": "platform_accountant", "description": "Handles platform financial matters"},
             {"name": "platform_developer", "description": "Technical developer role for platform"},
@@ -32,7 +30,9 @@ def initialize_default_roles_permissions(db: Session):
             {"name": "platform_content_moderator", "description": "Content moderation role for platform"},
             {"name": "platform_agent", "description": "Agent handeling company campaigns"},
             
-            # New company-specific roles
+            # company-specific roles
+            {"name": "company_admin", "description": "Company administrator"},
+            {"name": "company_user", "description": "Company user"},
             {"name": "company_manager", "description": "Manager role within a company"},
             {"name": "company_accountant", "description": "Handles company financial matters"},
             {"name": "company_marketer", "description": "Marketing specialist for company"},
@@ -375,6 +375,63 @@ def initialize_default_roles_permissions(db: Session):
                 category = Category(**category_data)
                 db.add(category)
         
+
+        # Initialize default statuses
+        default_statuses = [
+            # list_member statuses
+            {"model": "list_member", "name": "discovered"},
+            {"model": "list_member", "name": "contacted"},
+            {"model": "list_member", "name": "responded"},
+            {"model": "list_member", "name": "negotiating"},
+            {"model": "list_member", "name": "onboarded"},
+            {"model": "list_member", "name": "declined"},
+            
+            # outreach statuses
+            {"model": "outreach", "name": "sent"},
+            {"model": "outreach", "name": "delivered"},
+            {"model": "outreach", "name": "read"},
+            {"model": "outreach", "name": "failed"},
+
+            # campaign statuses
+            {"model": "campaign", "name": "draft"},
+            {"model": "campaign", "name": "planning"},
+            {"model": "campaign", "name": "active"},
+            {"model": "campaign", "name": "paused"},
+            {"model": "campaign", "name": "completed"},
+            {"model": "campaign", "name": "cancelled"},
+            
+            # list_assignment statuses
+            {"model": "list_assignment", "name": "pending"},
+            {"model": "list_assignment", "name": "active"},
+            {"model": "list_assignment", "name": "completed"},
+            {"model": "list_assignment", "name": "failed"}
+        ]
+
+        for status_data in default_statuses:
+            status = db.query(Status).filter(
+                Status.model == status_data["model"],
+                Status.name == status_data["name"]
+            ).first()
+            if not status:
+                status = Status(**status_data)
+                db.add(status)
+
+        # Initialize default message channels
+        default_channels = [
+            {"name": "Direct Message", "shortname": "DM"},
+            {"name": "Story Mention", "shortname": "Story"},
+            {"name": "Highlight", "shortname": "HL"},
+            {"name": "Comment", "shortname": "Comment"},
+            {"name": "Email", "shortname": "Email"},
+            {"name": "WhatsApp", "shortname": "WhatsApp"}
+        ]
+
+        for channel_data in default_channels:
+            channel = db.query(MessageChannel).filter(MessageChannel.shortname == channel_data["shortname"]).first()
+            if not channel:
+                channel = MessageChannel(**channel_data)
+                db.add(channel)
+                
         # Create default super-admin if none exists
         try:
             # First check if platform_admin role exists
@@ -424,6 +481,7 @@ def initialize_default_roles_permissions(db: Session):
         except Exception as e:
             logger.error(f"Error creating super-admin: {str(e)}")
             # Don't raise the exception here to allow the rest of the initialization to continue
+
         
         db.commit()
         logger.info("Default roles, permissions, platforms, and categories initialized successfully")

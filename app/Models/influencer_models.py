@@ -16,14 +16,13 @@ class Influencer(Base):
     
     # Relationships
     user = relationship("User", back_populates="influencer")
-    social_accounts = relationship("InfluencerSocialAccount", back_populates="influencer", cascade="all, delete-orphan")
-    contacts = relationship("InfluencerContact", back_populates="influencer", cascade="all, delete-orphan")
+    social_accounts = relationship("SocialAccount", back_populates="influencer", cascade="all, delete-orphan")
 
-class InfluencerSocialAccount(Base):
-    __tablename__ = 'influencer_social_accounts'
+class SocialAccount(Base):
+    __tablename__ = 'social_accounts'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    influencer_id = Column(UUID(as_uuid=True), ForeignKey('influencers.id', ondelete='CASCADE'), nullable=False)
+    influencer_id = Column(UUID(as_uuid=True), ForeignKey('influencers.id', ondelete='CASCADE'), nullable=True)
     platform_id = Column(UUID(as_uuid=True), ForeignKey('platforms.id', ondelete='CASCADE'), nullable=False)
     platform_account_id = Column(String(255), nullable=False)
     account_handle = Column(String(100), nullable=False)
@@ -44,13 +43,21 @@ class InfluencerSocialAccount(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
     has_clips = Column(Boolean, default=False)
     additional_metrics = Column(JSONB, nullable=True)
+    # New fields
+    claimed_at = Column(DateTime, nullable=True)
+    claimed_status = Column(String(50), nullable=True)  # e.g., "pending", "verified", "rejected"
+    verification_method = Column(String(100), nullable=True)  # e.g., "email", "dm", "phone"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    influencer = relationship("Influencer", back_populates="social_accounts")
+    influencer = relationship("Influencer", back_populates="social_accounts", foreign_keys=[influencer_id])
     platform = relationship("Platform", back_populates="social_accounts")
     category = relationship("Category", back_populates="social_accounts")
+    list_memberships = relationship("CampaignListMember", back_populates="social_account")
+    contacts = relationship("InfluencerContact", back_populates="social_account")
+    outreach_records = relationship("InfluencerOutreach", back_populates="social_account", overlaps="social_account")
+
     
     # Unique constraint to prevent duplicate platform accounts per influencer
     __table_args__ = (
@@ -61,7 +68,7 @@ class InfluencerContact(Base):
     __tablename__ = 'influencer_contacts'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    influencer_id = Column(UUID(as_uuid=True), ForeignKey('influencers.id', ondelete='CASCADE'), nullable=False)
+    social_account_id = Column(UUID(as_uuid=True), ForeignKey('social_accounts.id', ondelete='CASCADE'), nullable=False)
     platform_specific = Column(Boolean, default=False, nullable=False)
     platform_id = Column(UUID(as_uuid=True), ForeignKey('platforms.id', ondelete='SET NULL'), nullable=True)
     role_id = Column(UUID(as_uuid=True), ForeignKey('roles.id', ondelete='SET NULL'), nullable=True)
@@ -73,6 +80,6 @@ class InfluencerContact(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    influencer = relationship("Influencer", back_populates="contacts")
+    social_account = relationship("SocialAccount", back_populates="contacts")
     platform = relationship("Platform")
     role = relationship("Role")

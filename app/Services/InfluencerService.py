@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 import uuid
 
 from app.Models.influencer_models import (
-    Influencer, InfluencerSocialAccount, InfluencerContact
+    Influencer, SocialAccount, InfluencerContact
 )
 from app.Models.auth_models import User
 from app.Utils.Logger import logger
@@ -183,7 +183,7 @@ class InfluencerService:
             db: Database session
             
         Returns:
-            InfluencerSocialAccount: The created social account
+            SocialAccount: The created social account
         """
         try:
             # Check if influencer exists
@@ -196,9 +196,9 @@ class InfluencerService:
             
             # Check if account already exists for this platform
             platform_id = account_data.get('platform_id')
-            existing_account = db.query(InfluencerSocialAccount).filter(
-                InfluencerSocialAccount.influencer_id == influencer_id,
-                InfluencerSocialAccount.platform_id == platform_id
+            existing_account = db.query(SocialAccount).filter(
+                SocialAccount.influencer_id == influencer_id,
+                SocialAccount.platform_id == platform_id
             ).first()
             
             if existing_account:
@@ -209,7 +209,7 @@ class InfluencerService:
             
             # Create social account
             account_data['influencer_id'] = influencer_id
-            social_account = InfluencerSocialAccount(**account_data)
+            social_account = SocialAccount(**account_data)
             
             db.add(social_account)
             db.commit()
@@ -235,11 +235,11 @@ class InfluencerService:
             db: Database session
             
         Returns:
-            InfluencerSocialAccount: The updated social account
+            SocialAccount: The updated social account
         """
         try:
-            social_account = db.query(InfluencerSocialAccount).filter(
-                InfluencerSocialAccount.id == account_id
+            social_account = db.query(SocialAccount).filter(
+                SocialAccount.id == account_id
             ).first()
             
             if not social_account:
@@ -278,8 +278,8 @@ class InfluencerService:
             bool: True if successful
         """
         try:
-            social_account = db.query(InfluencerSocialAccount).filter(
-                InfluencerSocialAccount.id == account_id
+            social_account = db.query(SocialAccount).filter(
+                SocialAccount.id == account_id
             ).first()
             
             if not social_account:

@@ -48,6 +48,10 @@ class UserCreate(UserBase):
     user_type: str = Field(..., pattern=r'^(platform|company|influencer)$')
     company_id: Optional[str] = None  # Use str for UUID
     role_name: Optional[str] = None
+
+    # Company related fields
+    company_name: Optional[str] = None
+    company_domain: Optional[str] = None
     
     @field_validator('password')
     def password_strength(cls, v: str) -> str:
@@ -88,6 +92,7 @@ class UserResponse(BaseModel):
     full_name: str
     phone_number: Optional[str] = None
     status: str
+    user_type: Optional[str] = None
     email_verified: bool
     profile_image_url: Optional[str] = None
     created_at: datetime
@@ -105,7 +110,22 @@ class UserResponse(BaseModel):
             return str(v)
         return v
     
+class CompanyBriefResponse(BaseModel):
+    id: str
+    name: str
+    domain: Optional[str] = None
+    created_at: datetime
     
+    model_config = {
+        "from_attributes": True
+    }
+    
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v 
 
 class CompanyBase(BaseModel):
     name: str
@@ -175,11 +195,21 @@ class SocialAccountResponse(SocialAccountBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+class UserDetailResponse(UserResponse):
+    """Extended user response with additional details like company info"""
+    roles: List[RoleResponse] = []
+    company: Optional[CompanyBriefResponse] = None
+    
+    model_config = {
+        "from_attributes": True
+    }
+
 class LoginResponse(TokenResponse):
     user: UserResponse
     roles: List[RoleResponse]
     refresh_token: str
-
+    company: Optional[CompanyBriefResponse] = None
+    
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 

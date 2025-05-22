@@ -16,6 +16,11 @@ user_roles = Table(
     Column('role_id', UUID(as_uuid=True), ForeignKey('roles.id', ondelete='CASCADE'), primary_key=True)
 )
 
+class UserType(enum.Enum):
+    PLATFORM = "platform"
+    COMPANY = "company"
+    INFLUENCER = "influencer"
+
 class UserStatus(enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
@@ -32,6 +37,7 @@ class User(Base):
     phone_number = Column(String(20), nullable=True)
     profile_image_url = Column(String(255), nullable=True)
     status = Column(String(20), default=UserStatus.PENDING.value)
+    user_type = Column(String(20), nullable=True)
     email_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -46,6 +46,7 @@ class CategoryResponse(CategoryBase):
 class InfluencerContactBase(BaseModel):
     platform_specific: bool = False
     platform_id: Optional[uuid.UUID] = None
+    social_account_id: Optional[uuid.UUID] = None  # Added field
     role_id: Optional[uuid.UUID] = None
     name: Optional[str] = None
     contact_type: str
@@ -58,6 +59,7 @@ class InfluencerContactCreate(InfluencerContactBase):
 class InfluencerContactUpdate(BaseModel):
     platform_specific: Optional[bool] = None
     platform_id: Optional[uuid.UUID] = None
+    social_account_id: Optional[uuid.UUID] = None  # Added field
     role_id: Optional[uuid.UUID] = None
     name: Optional[str] = None
     contact_type: Optional[str] = None
@@ -72,7 +74,7 @@ class InfluencerContactResponse(InfluencerContactBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-class InfluencerSocialAccountBase(BaseModel):
+class SocialAccountBase(BaseModel):
     platform_id: uuid.UUID
     platform_account_id: str
     account_handle: str
@@ -93,11 +95,18 @@ class InfluencerSocialAccountBase(BaseModel):
     category_id: Optional[uuid.UUID] = None
     has_clips: bool = False
     additional_metrics: Optional[Dict[str, Any]] = None
+    # New fields
+    claimed_at: Optional[datetime] = None
+    claimed_status: Optional[str] = None
+    verification_method: Optional[str] = None
 
-class InfluencerSocialAccountCreate(InfluencerSocialAccountBase):
+class SocialAccountCreate(SocialAccountBase):
     influencer_id: uuid.UUID
 
-class InfluencerSocialAccountUpdate(BaseModel):
+class SocialAccountCreate(SocialAccountBase):
+    influencer_id: uuid.UUID
+
+class SocialAccountUpdate(BaseModel):
     platform_account_id: Optional[str] = None
     account_handle: Optional[str] = None
     full_name: Optional[str] = None
@@ -117,8 +126,12 @@ class InfluencerSocialAccountUpdate(BaseModel):
     category_id: Optional[uuid.UUID] = None
     has_clips: Optional[bool] = None
     additional_metrics: Optional[Dict[str, Any]] = None
+    # New fields
+    claimed_at: Optional[datetime] = None
+    claimed_status: Optional[str] = None
+    verification_method: Optional[str] = None
 
-class InfluencerSocialAccountResponse(InfluencerSocialAccountBase):
+class SocialAccountResponse(SocialAccountBase):
     id: uuid.UUID
     influencer_id: uuid.UUID
     platform: PlatformResponse
@@ -141,7 +154,7 @@ class InfluencerResponse(InfluencerBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-    social_accounts: List[InfluencerSocialAccountResponse] = []
+    social_accounts: List[SocialAccountResponse] = []
     contacts: List[InfluencerContactResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

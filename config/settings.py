@@ -14,7 +14,7 @@ PYDANTIC_V2 = version.parse(pydantic.__version__) >= version.parse("2.0.0")
 
 if PYDANTIC_V2:
     # For Pydantic v2
-    from pydantic_settings import BaseSettings
+    from pydantic_settings import BaseSettings, SettingsConfigDict
     from pydantic import field_validator
 else:
     # For Pydantic v1
@@ -43,8 +43,8 @@ class Settings(BaseSettings):
 
     # Security settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
     ALGORITHM: str = "HS256"
     
     # CORS settings
@@ -54,8 +54,13 @@ class Settings(BaseSettings):
     ).split(",")
     
     # Database settings
-    DATABASE_URL: str = "postgresql://postgres:echooo123@localhost:5432/echooo_development_v0"
-
+    DB_TYPE: str = os.getenv("DB_TYPE", "postgresql")
+    DB_USERNAME: str = os.getenv("DB_USERNAME", "postgres")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "echooo123")
+    DB_HOST: str = os.getenv("DB_HOST", "localhost")
+    DB_PORT: str = os.getenv("DB_PORT", "5432")
+    DB_NAME: str = os.getenv("DB_NAME", "echooo_development_v0")
+    
     # Email settings
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() == "true"
     SMTP_PORT: Optional[int] = int(os.getenv("SMTP_PORT", "587"))
@@ -73,16 +78,26 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
     RATE_LIMIT_PERIOD_SECONDS: int = int(os.getenv("RATE_LIMIT_PERIOD_SECONDS", "3600"))
     
-    # Define model config (v2 style)
+    # For Pydantic v2
     if PYDANTIC_V2:
-        model_config = {
-            "case_sensitive": True,
-            "env_file": ".env"
-        }
+        model_config = SettingsConfigDict(
+            case_sensitive=True,
+            env_file=".env",
+            extra="ignore"  # Allow extra fields in the environment
+        )
     else:
         class Config:
             case_sensitive = True
             env_file = ".env"
+            extra = "ignore"  # Allow extra fields in the environment
+
+    # Define database URL property
+    @property
+    def DATABASE_URL(self) -> str:
+        """
+        Assemble the database URL from components
+        """
+        return f"{self.DB_TYPE}://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     # Define the validator based on Pydantic version
     if PYDANTIC_V2:

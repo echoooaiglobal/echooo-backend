@@ -8,7 +8,7 @@ from app.Http.Controllers.InfluencerController import InfluencerController
 from app.Models.auth_models import User
 from app.Schemas.influencer import (
     InfluencerCreate, InfluencerUpdate, InfluencerResponse,
-    InfluencerSocialAccountCreate, InfluencerSocialAccountUpdate, InfluencerSocialAccountResponse,
+    SocialAccountCreate, SocialAccountUpdate, SocialAccountResponse,
     InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse
 )
 from app.Utils.Helpers import (
@@ -74,20 +74,20 @@ async def delete_influencer(
     return await InfluencerController.delete_influencer(influencer_id, db)
 
 # Influencer social account endpoints
-@router.post("/{influencer_id}/social-accounts", response_model=InfluencerSocialAccountResponse)
+@router.post("/{influencer_id}/social-accounts", response_model=SocialAccountResponse)
 async def add_social_account(
     influencer_id: uuid.UUID,
-    account_data: InfluencerSocialAccountCreate,
+    account_data: SocialAccountCreate,
     current_user: User = Depends(has_permission("influencer:update")),
     db: Session = Depends(get_db)
 ):
     """Add a social account to an influencer"""
     return await InfluencerController.add_social_account(influencer_id, account_data, db)
 
-@router.put("/social-accounts/{account_id}", response_model=InfluencerSocialAccountResponse)
+@router.put("/social-accounts/{account_id}", response_model=SocialAccountResponse)
 async def update_social_account(
     account_id: uuid.UUID,
-    account_data: InfluencerSocialAccountUpdate,
+    account_data: SocialAccountUpdate,
     current_user: User = Depends(has_permission("influencer:update")),
     db: Session = Depends(get_db)
 ):

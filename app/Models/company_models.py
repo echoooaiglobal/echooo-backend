@@ -19,9 +19,9 @@ class Company(Base):
     # Relationships
     users = relationship("CompanyUser", back_populates="company", cascade="all, delete-orphan")
     contacts = relationship("CompanyContact", back_populates="company", cascade="all, delete-orphan")
-    
-    # Relationship to creator
     creator = relationship("User", foreign_keys=[created_by])
+    campaigns = relationship("Campaign", back_populates="company", cascade="all, delete-orphan")
+    message_templates = relationship("MessageTemplate", back_populates="company")
 
 class CompanyUser(Base):
     __tablename__ = 'company_users'

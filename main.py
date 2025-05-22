@@ -11,8 +11,11 @@ from config.database import get_db, engine
 from app.Models import Base  # Import Base from our new Models package
 from app.Utils.Logger import logger
 from app.Utils.db_init import initialize_default_roles_permissions
-from routes.api.v0 import companies, auth, instagram, influencers, platforms, categories
-    
+from routes.api.v0 import (
+    auth, campaign_list_members, instagram, influencers, platforms, companies,
+    categories, campaigns, statuses, message_channels, agents, list_assignments, message_templates
+)
+
 # Create FastAPI application context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -86,6 +89,15 @@ app.include_router(instagram.router, prefix=settings.API_V0_STR, tags=["Instagra
 app.include_router(categories.router, prefix=settings.API_V0_STR)
 app.include_router(platforms.router, prefix=settings.API_V0_STR)
 app.include_router(influencers.router, prefix=settings.API_V0_STR)
+app.include_router(campaigns.router, prefix=settings.API_V0_STR)
+app.include_router(statuses.router, prefix=settings.API_V0_STR)
+app.include_router(message_channels.router, prefix=settings.API_V0_STR)
+app.include_router(agents.router, prefix=settings.API_V0_STR)
+app.include_router(campaign_list_members.router, prefix=settings.API_V0_STR)
+app.include_router(list_assignments.router, prefix=settings.API_V0_STR)
+app.include_router(message_templates.router, prefix=settings.API_V0_STR)
+
+
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])

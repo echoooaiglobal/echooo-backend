@@ -8,10 +8,22 @@ from app.Models.company_models import (
     Company, CompanyUser, CompanyContact
 )
 from app.Models.influencer_models import (
-    Influencer, InfluencerSocialAccount, InfluencerContact
+    Influencer, SocialAccount, InfluencerContact
 )
 from app.Models.support_models import (
     Platform, Category
+)
+from app.Models.campaign_models import (
+    Status, MessageChannel, Agent, Campaign, 
+    CampaignList, 
+    ListAssignment, InfluencerOutreach
+)
+from app.Models.message_templates import (
+    MessageTemplate
+)
+
+from app.Models.campaign_list_members import (
+    CampaignListMember
 )
 
 # This makes it easier to import models elsewhere
@@ -20,6 +32,9 @@ __all__ = [
     'User', 'Role', 'Permission', 'RolePermission', 'RefreshToken', 'UserStatus',
     'user_roles',
     'Company', 'CompanyUser', 'CompanyContact',
-    'Influencer', 'InfluencerSocialAccount', 'InfluencerContact',
-    'Platform', 'Category'
+    'Influencer', 'SocialAccount', 'InfluencerContact',
+    'Platform', 'Category',
+    'Status', 'MessageChannel', 'Agent', 'Campaign',
+    'CampaignList', 'CampaignListMember', 'MessageTemplate',
+    'ListAssignment', 'InfluencerOutreach'
 ]
