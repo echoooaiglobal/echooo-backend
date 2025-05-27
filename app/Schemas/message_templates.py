@@ -6,7 +6,7 @@ import uuid
 
 # Message Template schemas
 class MessageTemplateBase(BaseModel):
-    name: str
+    subject: str
     content: str
     company_id: str
     campaign_id: str
@@ -16,7 +16,7 @@ class MessageTemplateCreate(MessageTemplateBase):
     pass
 
 class MessageTemplateUpdate(BaseModel):
-    name: Optional[str] = None
+    subject: Optional[str] = None
     content: Optional[str] = None
     is_global: Optional[bool] = None
 
@@ -54,12 +54,12 @@ class InfluencerListMemberUpdate(BaseModel):
 # Update InfluencerListBase to include message_template_id
 class InfluencerListBase(BaseModel):
     campaign_id: str
-    name: str
+    subject: str
     description: Optional[str] = None
     message_template_id: Optional[str] = None  # Add this field
 
 # Update InfluencerListUpdate to include message_template_id
 class InfluencerListUpdate(BaseModel):
-    name: Optional[str] = None
+    subject: Optional[str] = None
     description: Optional[str] = None
     message_template_id: Optional[str] = None  # Add this field
