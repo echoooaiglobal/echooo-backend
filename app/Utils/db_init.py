@@ -455,7 +455,7 @@ def initialize_default_roles_permissions(db: Session):
                         email=admin_email,
                         hashed_password=AuthController.get_password_hash(admin_password),
                         full_name="System Administrator",
-                        user_type="platform_admin",
+                        user_type="platform",
                         status=UserStatus.ACTIVE.value,
                         email_verified=True
                     )
