@@ -9,7 +9,7 @@ class MessageTemplate(Base):
     __tablename__ = 'message_templates'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String(100), nullable=False)  # Template name
+    subject = Column(String(100), nullable=False)  # Template subject
     content = Column(Text, nullable=False)  # Template content with placeholders
     company_id = Column(UUID(as_uuid=True), ForeignKey('companies.id', ondelete='CASCADE'), nullable=False)
     campaign_id = Column(UUID(as_uuid=True), ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False)  # Added field
