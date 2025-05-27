@@ -211,17 +211,17 @@ class CampaignListResponse(CampaignListBase):
 
 # Message Template schemas
 class MessageTemplateBase(BaseModel):
-    name: str
+    subject: str
     content: str
     company_id: str
     campaign_id: str
-    is_global: bool = False
+    is_global: bool = True
 
 class MessageTemplateCreate(MessageTemplateBase):
     pass
 
 class MessageTemplateUpdate(BaseModel):
-    name: Optional[str] = None
+    subject: Optional[str] = None
     content: Optional[str] = None
     is_global: Optional[bool] = None
 
