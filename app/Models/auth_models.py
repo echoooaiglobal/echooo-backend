@@ -100,3 +100,27 @@ class RefreshToken(Base):
         token = str(uuid.uuid4())
         expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
         return cls(token=token, user_id=user_id, expires_at=expires_at)
+    
+class EmailVerificationToken(Base):
+    __tablename__ = 'email_verification_tokens'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="email_verification_tokens")
+    
+    @classmethod
+    def create_token(cls, user_id: uuid.UUID, expires_in_hours: int = 24):
+        """Create a new email verification token"""
+        token = str(uuid.uuid4())
+        expires_at = datetime.utcnow() + timedelta(hours=expires_in_hours)
+        return cls(token=token, user_id=user_id, expires_at=expires_at)
+    
+    def is_valid(self) -> bool:
+        """Check if token is still valid"""
+        return not self.is_used and self.expires_at > datetime.utcnow()

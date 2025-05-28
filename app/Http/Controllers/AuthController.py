@@ -8,10 +8,13 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import uuid
 
+from app.Services.EmailVerificationService import EmailVerificationService
 from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, TokenData, 
     LoginResponse, RoleResponse, PasswordResetRequest, 
-    PasswordReset, UserUpdate, CompanyBriefResponse, UserDetailResponse
+    PasswordReset, UserUpdate, CompanyBriefResponse, UserDetailResponse,
+    EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
+    ResendVerificationRequest, ManualVerificationRequest
 )
 from app.Schemas.company import CompanyCreate
 from app.Models.auth_models import User, Role, RefreshToken, UserStatus
@@ -230,7 +233,22 @@ class AuthController:
                 
                 # Create influencer profile
                 await InfluencerService.create_influencer_profile(db_user.id, db)
+            
+            try:
+                # Create email verification token
+                verification_token = await EmailVerificationService.create_verification_token(db_user.id, db)
                 
+                # In production, you would send this token via email
+                # For development, you can log it or return it in response
+                logger.info(f"Email verification token for {db_user.email}: {verification_token}")
+                
+                # Here you would typically add email sending to background tasks:
+                # background_tasks.add_task(send_verification_email, db_user.email, verification_token)
+                
+            except Exception as e:
+                logger.error(f"Error creating verification token during registration: {str(e)}")
+                # Don't fail registration if verification token creation fails
+            
             # Return the user
             return UserResponse.model_validate(db_user)
         except Exception as e:
@@ -485,3 +503,79 @@ class AuthController:
         db.refresh(current_user)
         
         return UserResponse.from_orm(current_user)
+    
+    @staticmethod
+    async def verify_email(token_data: EmailVerificationToken, db: Session):
+        """Verify user's email address"""
+        result = await EmailVerificationService.verify_email_token(token_data.token, db)
+        return EmailVerificationResponse(**result)
+    
+    @staticmethod
+    async def resend_verification_email(
+        email_data: ResendVerificationRequest, 
+        background_tasks: BackgroundTasks,
+        db: Session
+    ):
+        """Resend email verification link"""
+        try:
+            token = await EmailVerificationService.resend_verification_email(email_data.email, db)
+            
+            # In production, send email via background task
+            # background_tasks.add_task(send_verification_email, email_data.email, token)
+            
+            # For development, log the token
+            logger.info(f"New verification token for {email_data.email}: {token}")
+            
+            return {
+                "message": "If the email exists and is not verified, a new verification link has been sent",
+                "token": token  # Remove this in production
+            }
+        except Exception as e:
+            logger.error(f"Error resending verification email: {str(e)}")
+            return {
+                "message": "If the email exists and is not verified, a new verification link has been sent"
+            }
+    
+    @staticmethod
+    async def manual_verify_user(
+        verification_data: ManualVerificationRequest,
+        current_user: User,
+        db: Session
+    ):
+        """Manually verify a user (development only)"""
+        # Check if current user is platform admin
+        is_admin = any(role.name == "platform_admin" for role in current_user.roles)
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only platform admins can manually verify users"
+            )
+        
+        try:
+            user_id = uuid.UUID(verification_data.user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user ID format"
+            )
+        
+        result = await EmailVerificationService.manual_verify_user(
+            user_id,
+            verification_data.verification_type,
+            db
+        )
+        
+        return result
+    
+    @staticmethod
+    async def get_verification_status(user_id: str, db: Session):
+        """Get verification status for a user"""
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user ID format"
+            )
+        
+        return await EmailVerificationService.get_verification_status(user_uuid, db)
