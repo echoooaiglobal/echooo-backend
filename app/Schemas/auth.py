@@ -243,3 +243,36 @@ class PasswordReset(BaseModel):
         if not re.search(r'[0-9]', v):
             raise ValueError('Password must contain at least one number')
         return v
+    
+class EmailVerificationRequest(BaseModel):
+    email: EmailStr
+
+class EmailVerificationToken(BaseModel):
+    token: str
+
+class EmailVerificationResponse(BaseModel):
+    message: str
+    user_id: str
+    email_verified: bool
+    
+    @field_validator('user_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+# For development - Manual verification
+class ManualVerificationRequest(BaseModel):
+    user_id: str
+    verification_type: str = Field(..., pattern=r'^(email|company|influencer)$')
+    
+    @field_validator('verification_type')
+    def validate_verification_type(cls, v):
+        valid_types = ['email', 'company', 'influencer']
+        if v not in valid_types:
+            raise ValueError(f'Verification type must be one of: {", ".join(valid_types)}')
+        return v

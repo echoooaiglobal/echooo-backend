@@ -1,5 +1,5 @@
 # routes/api/v0/auth.py
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,9 @@ from app.Http.Controllers.AuthController import AuthController
 from app.Models.auth_models import User
 from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, RefreshTokenRequest, 
-    LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset, UserDetailResponse
+    LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset, UserDetailResponse,
+    EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
+    ResendVerificationRequest, ManualVerificationRequest
 )
 from app.Utils.Helpers import get_current_active_user, get_current_user
 from config.database import get_db
@@ -87,3 +89,76 @@ async def update_profile(
 ):
     """Update current user's profile"""
     return await AuthController.update_profile(user_data, current_user, db)
+
+
+@router.post("/verify-email", response_model=EmailVerificationResponse)
+async def verify_email(
+    token_data: EmailVerificationToken,
+    db: Session = Depends(get_db)
+):
+    """Verify user's email address using verification token"""
+    return await AuthController.verify_email(token_data, db)
+
+@router.post("/resend-verification")
+async def resend_verification_email(
+    email_data: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Resend email verification link"""
+    return await AuthController.resend_verification_email(email_data, background_tasks, db)
+
+@router.get("/verification-status/{user_id}")
+async def get_verification_status(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get verification status for a user (admin only or self)"""
+    # Check if user is admin or requesting their own status
+    is_admin = any(role.name == "platform_admin" for role in current_user.roles)
+    if not is_admin and str(current_user.id) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own verification status"
+        )
+    
+    return await AuthController.get_verification_status(user_id, db)
+
+# Development/Testing endpoints
+@router.post("/manual-verify")
+async def manual_verify_user(
+    verification_data: ManualVerificationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Manually verify a user (development/admin only)"""
+    return await AuthController.manual_verify_user(verification_data, current_user, db)
+
+@router.get("/dev/verification-tokens")
+async def list_verification_tokens(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all verification tokens (development only - admin access)"""
+    is_admin = any(role.name == "platform_admin" for role in current_user.roles)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    from app.Models.auth_models import EmailVerificationToken
+    tokens = db.query(EmailVerificationToken).join(User).all()
+    
+    return [
+        {
+            "token": token.token,
+            "user_email": token.user.email,
+            "user_id": str(token.user.id),
+            "expires_at": token.expires_at,
+            "is_used": token.is_used,
+            "created_at": token.created_at
+        }
+        for token in tokens
+    ]
