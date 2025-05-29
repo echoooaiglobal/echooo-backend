@@ -1,7 +1,7 @@
 # app/Schemas/auth.py
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, validator, root_validator
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 import re
 import pydantic
@@ -276,3 +276,45 @@ class ManualVerificationRequest(BaseModel):
         if v not in valid_types:
             raise ValueError(f'Verification type must be one of: {", ".join(valid_types)}')
         return v
+    
+#-----------------------------new------------------------------------
+class UserStatusUpdate(BaseModel):
+    status: str = Field(..., pattern=r'^(active|inactive|pending|suspended)$')
+
+class UserRoleUpdate(BaseModel):
+    role_ids: List[str]  # List of role UUIDs as strings
+
+class AdminPasswordReset(BaseModel):
+    new_password: str = Field(..., min_length=8)
+    
+    @field_validator('new_password')
+    def password_strength(cls, v: str) -> str:
+        """Validate password meets complexity requirements"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one number')
+        return v
+
+class UserListResponse(BaseModel):
+    users: List[UserDetailResponse]
+    total: int
+    skip: int
+    limit: int
+
+class UserStatsResponse(BaseModel):
+    total_users: int
+    users_by_type: Dict[str, int]
+    users_by_status: Dict[str, int]
+    recent_registrations: int
+
+# Extend existing UserUpdate for admin operations
+class AdminUserUpdate(UserUpdate):
+    email: Optional[EmailStr] = None
+    user_type: Optional[str] = Field(None, pattern=r'^(platform|company|influencer)$')
+    status: Optional[str] = Field(None, pattern=r'^(active|inactive|pending|suspended)$')
+    email_verified: Optional[bool] = None

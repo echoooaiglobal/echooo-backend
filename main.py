@@ -12,7 +12,7 @@ from app.Models import Base  # Import Base from our new Models package
 from app.Utils.Logger import logger
 from app.Utils.db_init import initialize_default_roles_permissions
 from routes.api.v0 import (
-    auth, campaign_list_members, instagram, influencers, platforms, companies,
+    auth, users, campaign_list_members, instagram, influencers, platforms, companies,
     categories, campaigns, statuses, message_channels, agents, list_assignments, message_templates
 )
 
@@ -84,6 +84,7 @@ async def log_requests(request: Request, call_next):
 
 # Include routers
 app.include_router(auth.router, prefix=settings.API_V0_STR)
+app.include_router(users.router, prefix=settings.API_V0_STR)
 app.include_router(companies.router, prefix=settings.API_V0_STR)
 app.include_router(instagram.router, prefix=settings.API_V0_STR, tags=["Instagram Bot"])
 app.include_router(categories.router, prefix=settings.API_V0_STR)
