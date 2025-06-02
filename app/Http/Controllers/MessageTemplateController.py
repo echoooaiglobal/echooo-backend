@@ -60,12 +60,25 @@ class MessageTemplateController:
     ):
         """Create a new message template"""
         try:
-            template = await MessageTemplateService.create_template(
+            result = await MessageTemplateService.create_template(
                 template_data.model_dump(exclude_unset=True),
                 current_user.id,
                 db
             )
-            return MessageTemplateResponse.model_validate(template)
+            
+            # Always return just the template, regardless of assignment result
+            if isinstance(result, dict) and "template" in result:
+                template = result["template"]
+                assignment_info = result.get("assignment")
+                
+                # Log assignment info for debugging
+                if assignment_info:
+                    logger.info(f"Assignment created: {assignment_info}")
+                
+                return MessageTemplateResponse.model_validate(template)
+            else:
+                return MessageTemplateResponse.model_validate(result)
+                
         except Exception as e:
             logger.error(f"Error in create_template controller: {str(e)}")
             raise

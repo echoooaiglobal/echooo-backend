@@ -9,6 +9,9 @@ from app.Models import (
     Platform, Category, UserStatus, user_roles, Status, MessageChannel
 )
 
+# Import dictionary data
+from app.Utils.dictionaries import DEFAULT_CATEGORIES, DEFAULT_PLATFORMS
+
 def initialize_default_roles_permissions(db: Session):
     """
     Initialize database with default roles and permissions
@@ -28,7 +31,7 @@ def initialize_default_roles_permissions(db: Session):
             {"name": "platform_developer", "description": "Technical developer role for platform"},
             {"name": "platform_customer_support", "description": "Customer support agent for platform"},
             {"name": "platform_content_moderator", "description": "Content moderation role for platform"},
-            {"name": "platform_agent", "description": "Agent handeling company campaigns"},
+            {"name": "platform_agent", "description": "Agent handeling company campaigns lists"},
             
             # company-specific roles
             {"name": "company_admin", "description": "Company administrator"},
@@ -339,37 +342,18 @@ def initialize_default_roles_permissions(db: Session):
                 if not role_perm:
                     role_perm = RolePermission(role_id=company_creator.id, permission_id=perm.id)
                     db.add(role_perm)
-                    
         
-        # Initialize default platforms
-        default_platforms = [
-            {"name": "Instagram", "description": "Instagram social media platform"},
-            {"name": "TikTok", "description": "TikTok social media platform"},
-            {"name": "YouTube", "description": "YouTube video platform"},
-            {"name": "Twitter", "description": "Twitter social media platform"},
-            {"name": "Facebook", "description": "Facebook social media platform"},
-            {"name": "LinkedIn", "description": "LinkedIn professional network"}
-        ]
-        
-        for platform_data in default_platforms:
+        # Initialize platforms from dictionary
+        logger.info("Initializing platforms from dictionary...")
+        for platform_data in DEFAULT_PLATFORMS:
             platform = db.query(Platform).filter(Platform.name == platform_data["name"]).first()
             if not platform:
                 platform = Platform(**platform_data)
                 db.add(platform)
-        
-        # Initialize default categories
-        default_categories = [
-            {"name": "Fashion", "description": "Fashion and clothing"},
-            {"name": "Beauty", "description": "Beauty and makeup"},
-            {"name": "Fitness", "description": "Fitness and health"},
-            {"name": "Travel", "description": "Travel and adventure"},
-            {"name": "Food", "description": "Food and cooking"},
-            {"name": "Tech", "description": "Technology and gadgets"},
-            {"name": "Gaming", "description": "Gaming and eSports"},
-            {"name": "Lifestyle", "description": "Lifestyle and daily living"}
-        ]
-        
-        for category_data in default_categories:
+
+
+        # Initialize default categories from dictionary
+        for category_data in DEFAULT_CATEGORIES:
             category = db.query(Category).filter(Category.name == category_data["name"]).first()
             if not category:
                 category = Category(**category_data)

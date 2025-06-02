@@ -7,6 +7,12 @@ import uuid
 class PlatformBase(BaseModel):
     name: str
     description: Optional[str] = None
+    logo_url: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = None
+    url: Optional[str] = None
+    work_platform_id: Optional[str] = None
+    products: Optional[Dict[str, Any]] = None
 
 class PlatformCreate(PlatformBase):
     pass
