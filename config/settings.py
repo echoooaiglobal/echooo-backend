@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # CORS settings
     BACKEND_CORS_ORIGINS: List[str] = os.getenv(
         "BACKEND_CORS_ORIGINS", 
-        "http://localhost,http://localhost:8000,http://localhost:3000"
+        "http://localhost,http://localhost:8000,http://localhost:3000,http://35.244.31.63:3000"
     ).split(",")
     
     # Database settings
