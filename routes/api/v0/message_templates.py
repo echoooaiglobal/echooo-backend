@@ -6,7 +6,7 @@ import uuid
 
 from app.Http.Controllers.MessageTemplateController import MessageTemplateController
 from app.Models.auth_models import User
-from app.Schemas.campaign import MessageTemplateCreate, MessageTemplateUpdate, MessageTemplateResponse
+from app.Schemas.message_templates import MessageTemplateCreate, MessageTemplateUpdate, MessageTemplateResponse
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission
 )

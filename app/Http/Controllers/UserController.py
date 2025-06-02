@@ -363,3 +363,207 @@ class UserController:
         except Exception as e:
             logger.error(f"Error in admin_reset_password controller: {str(e)}")
             raise
+    
+    # ============= NEW ROLE ASSIGNMENT METHODS =============
+    
+    @staticmethod
+    async def get_user_roles(user_id: uuid.UUID, db: Session):
+        """Get all roles assigned to a user"""
+        try:
+            user = db.query(User).options(
+                joinedload(User.roles)
+            ).filter(User.id == user_id).first()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            from app.Schemas.role import UserRoleResponse, RoleResponse
+            
+            return UserRoleResponse(
+                user_id=str(user.id),
+                roles=[RoleResponse.model_validate(role) for role in user.roles]
+            )
+        except Exception as e:
+            logger.error(f"Error in get_user_roles controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def assign_roles_to_user(user_id: uuid.UUID, role_ids: List[str], db: Session):
+        """Assign roles to a user (replaces existing roles)"""
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Convert string UUIDs to UUID objects and get roles
+            role_uuids = [uuid.UUID(role_id) for role_id in role_ids]
+            roles = db.query(Role).filter(Role.id.in_(role_uuids)).all()
+            
+            if len(roles) != len(role_uuids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more roles not found"
+                )
+            
+            # Replace all roles
+            user.roles = roles
+            db.commit()
+            db.refresh(user)
+            
+            from app.Schemas.role import UserRoleResponse, RoleResponse
+            
+            return UserRoleResponse(
+                user_id=str(user.id),
+                roles=[RoleResponse.model_validate(role) for role in user.roles]
+            )
+        except Exception as e:
+            logger.error(f"Error in assign_roles_to_user controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def add_roles_to_user(user_id: uuid.UUID, role_ids: List[str], db: Session):
+        """Add roles to a user (keeps existing roles)"""
+        try:
+            user = db.query(User).options(
+                joinedload(User.roles)
+            ).filter(User.id == user_id).first()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Convert string UUIDs to UUID objects and get roles
+            role_uuids = [uuid.UUID(role_id) for role_id in role_ids]
+            new_roles = db.query(Role).filter(Role.id.in_(role_uuids)).all()
+            
+            if len(new_roles) != len(role_uuids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more roles not found"
+                )
+            
+            # Get existing role IDs
+            existing_role_ids = {role.id for role in user.roles}
+            
+            # Add only new roles (avoid duplicates)
+            for role in new_roles:
+                if role.id not in existing_role_ids:
+                    user.roles.append(role)
+            
+            db.commit()
+            db.refresh(user)
+            
+            from app.Schemas.role import UserRoleResponse, RoleResponse
+            
+            return UserRoleResponse(
+                user_id=str(user.id),
+                roles=[RoleResponse.model_validate(role) for role in user.roles]
+            )
+        except Exception as e:
+            logger.error(f"Error in add_roles_to_user controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def remove_role_from_user(user_id: uuid.UUID, role_id: uuid.UUID, db: Session):
+        """Remove a specific role from a user"""
+        try:
+            user = db.query(User).options(
+                joinedload(User.roles)
+            ).filter(User.id == user_id).first()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Find the role to remove
+            role_to_remove = None
+            for role in user.roles:
+                if role.id == role_id:
+                    role_to_remove = role
+                    break
+            
+            if not role_to_remove:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Role not assigned to this user"
+                )
+            
+            # Prevent removal of critical roles that would lock out the user
+            if role_to_remove.name == "platform_admin" and len(user.roles) == 1:
+                # Check if this is the last platform admin
+                admin_count = db.query(User).join(User.roles).filter(
+                    Role.name == "platform_admin"
+                ).count()
+                
+                if admin_count <= 1:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot remove the last platform admin role"
+                    )
+            
+            # Remove the role
+            user.roles.remove(role_to_remove)
+            db.commit()
+            db.refresh(user)
+            
+            return {"message": f"Role '{role_to_remove.name}' removed from user successfully"}
+        except Exception as e:
+            logger.error(f"Error in remove_role_from_user controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def bulk_assign_roles(bulk_assignment, db: Session):
+        """Assign roles to multiple users at once"""
+        try:
+            from app.Schemas.role import BulkUserRoleAssignment
+            
+            # Convert string UUIDs to UUID objects
+            user_uuids = [uuid.UUID(user_id) for user_id in bulk_assignment.user_ids]
+            role_uuids = [uuid.UUID(role_id) for role_id in bulk_assignment.role_ids]
+            
+            # Get users and roles
+            users = db.query(User).filter(User.id.in_(user_uuids)).all()
+            roles = db.query(Role).filter(Role.id.in_(role_uuids)).all()
+            
+            if len(users) != len(user_uuids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more users not found"
+                )
+            
+            if len(roles) != len(role_uuids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more roles not found"
+                )
+            
+            # Assign roles to all users
+            updated_users = []
+            for user in users:
+                user.roles = roles
+                updated_users.append({
+                    "user_id": str(user.id),
+                    "user_name": user.full_name,
+                    "roles": [role.name for role in roles]
+                })
+            
+            db.commit()
+            
+            return {
+                "message": f"Roles assigned to {len(users)} users successfully",
+                "updated_users": updated_users
+            }
+        except Exception as e:
+            logger.error(f"Error in bulk_assign_roles controller: {str(e)}")
+            raise

@@ -12,3 +12,4 @@ celery
 jwt
 python-jose
 passlib
+bcrypt==3.2.0

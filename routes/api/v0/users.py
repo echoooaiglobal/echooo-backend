@@ -7,6 +7,7 @@ import uuid
 from app.Http.Controllers.UserController import UserController
 from app.Models.auth_models import User
 from app.Schemas.auth import UserResponse, UserDetailResponse, UserUpdate
+from app.Schemas.role import UserRoleAssignment, BulkUserRoleAssignment, UserRoleResponse
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission
 )
@@ -95,6 +96,58 @@ async def update_user_status(
     """Update user status (activate/deactivate/suspend)"""
     return await UserController.update_user_status(user_id, new_status, db)
 
+# ============= NEW ROLE ASSIGNMENT ENDPOINTS =============
+
+@router.get("/{user_id}/roles", response_model=UserRoleResponse)
+async def get_user_roles(
+    user_id: uuid.UUID,
+    current_user: User = Depends(has_permission("user:read")),
+    db: Session = Depends(get_db)
+):
+    """Get all roles assigned to a specific user"""
+    return await UserController.get_user_roles(user_id, db)
+
+@router.put("/{user_id}/roles", response_model=UserRoleResponse)
+async def assign_roles_to_user(
+    user_id: uuid.UUID,
+    role_assignment: UserRoleAssignment,
+    current_user: User = Depends(has_role(["platform_admin"])),
+    db: Session = Depends(get_db)
+):
+    """Assign roles to a user (replaces existing roles)"""
+    return await UserController.assign_roles_to_user(user_id, role_assignment.role_ids, db)
+
+@router.post("/{user_id}/roles/add", response_model=UserRoleResponse)
+async def add_roles_to_user(
+    user_id: uuid.UUID,
+    role_assignment: UserRoleAssignment,
+    current_user: User = Depends(has_role(["platform_admin"])),
+    db: Session = Depends(get_db)
+):
+    """Add roles to a user (keeps existing roles)"""
+    return await UserController.add_roles_to_user(user_id, role_assignment.role_ids, db)
+
+@router.delete("/{user_id}/roles/{role_id}")
+async def remove_role_from_user(
+    user_id: uuid.UUID,
+    role_id: uuid.UUID,
+    current_user: User = Depends(has_role(["platform_admin"])),
+    db: Session = Depends(get_db)
+):
+    """Remove a specific role from a user"""
+    return await UserController.remove_role_from_user(user_id, role_id, db)
+
+@router.post("/bulk-assign-roles")
+async def bulk_assign_roles(
+    bulk_assignment: BulkUserRoleAssignment,
+    current_user: User = Depends(has_role(["platform_admin"])),
+    db: Session = Depends(get_db)
+):
+    """Assign roles to multiple users at once"""
+    return await UserController.bulk_assign_roles(bulk_assignment, db)
+
+# ============= EXISTING ENDPOINTS =============
+
 @router.put("/{user_id}/roles")
 async def update_user_roles(
     user_id: uuid.UUID,
@@ -102,7 +155,7 @@ async def update_user_roles(
     current_user: User = Depends(has_role(["platform_admin"])),
     db: Session = Depends(get_db)
 ):
-    """Update user roles"""
+    """Update user roles (DEPRECATED - use PUT /{user_id}/roles instead)"""
     return await UserController.update_user_roles(user_id, role_ids, db)
 
 @router.delete("/{user_id}")

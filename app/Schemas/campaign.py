@@ -209,36 +209,36 @@ class CampaignListResponse(CampaignListBase):
             return str(v)
         return v
 
-# Message Template schemas
-class MessageTemplateBase(BaseModel):
-    subject: str
-    content: str
-    company_id: str
-    campaign_id: str
-    is_global: bool = True
+# # Message Template schemas
+# class MessageTemplateBase(BaseModel):
+#     subject: str
+#     content: str
+#     company_id: str
+#     campaign_id: str
+#     is_global: bool = True
 
-class MessageTemplateCreate(MessageTemplateBase):
-    pass
+# class MessageTemplateCreate(MessageTemplateBase):
+#     pass
 
-class MessageTemplateUpdate(BaseModel):
-    subject: Optional[str] = None
-    content: Optional[str] = None
-    is_global: Optional[bool] = None
+# class MessageTemplateUpdate(BaseModel):
+#     subject: Optional[str] = None
+#     content: Optional[str] = None
+#     is_global: Optional[bool] = None
 
-class MessageTemplateResponse(MessageTemplateBase):
-    id: str
-    created_by: str
-    created_at: datetime
-    updated_at: datetime
+# class MessageTemplateResponse(MessageTemplateBase):
+#     id: str
+#     created_by: str
+#     created_at: datetime
+#     updated_at: datetime
     
-    model_config = {"from_attributes": True}
+#     model_config = {"from_attributes": True}
     
-    @field_validator('id', 'company_id', 'campaign_id', 'created_by', mode='before')
-    @classmethod
-    def convert_uuid_to_str(cls, v):
-        if isinstance(v, uuid.UUID):
-            return str(v)
-        return v
+#     @field_validator('id', 'company_id', 'campaign_id', 'created_by', mode='before')
+#     @classmethod
+#     def convert_uuid_to_str(cls, v):
+#         if isinstance(v, uuid.UUID):
+#             return str(v)
+#         return v
 
 # ListAssignment schemas
 class ListAssignmentBase(BaseModel):

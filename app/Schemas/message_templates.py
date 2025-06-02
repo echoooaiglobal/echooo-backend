@@ -13,7 +13,8 @@ class MessageTemplateBase(BaseModel):
     is_global: bool = False
 
 class MessageTemplateCreate(MessageTemplateBase):
-    pass
+    auto_assign_agent: Optional[bool] = False
+    target_list_id: Optional[str] = None
 
 class MessageTemplateUpdate(BaseModel):
     subject: Optional[str] = None

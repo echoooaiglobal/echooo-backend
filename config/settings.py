@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "echooo123")
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: str = os.getenv("DB_PORT", "5432")
-    DB_NAME: str = os.getenv("DB_NAME", "echooo_development_v0")
+    DB_NAME: str = os.getenv("DB_NAME", "echooo_development_002")
     
     # Email settings
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() == "true"
