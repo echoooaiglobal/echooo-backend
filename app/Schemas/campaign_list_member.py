@@ -1,10 +1,10 @@
-# app/Schemas/campaign_list_member.py
+# app/Schemas/campaign_list_member.py (Updated)
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 
-# Brief schemas for related models
+# Brief schemas for related models (keeping existing ones)
 class StatusBrief(BaseModel):
     id: str
     name: str
@@ -56,7 +56,7 @@ class SocialAccountBrief(BaseModel):
             return str(v)
         return v
 
-# Social account data schema (for input)
+# Social account data schema (for input) - keeping existing
 class SocialAccountData(BaseModel):
     id: str  # Platform-specific account ID
     username: str
@@ -65,7 +65,7 @@ class SocialAccountData(BaseModel):
     followers: Optional[str] = None
     isVerified: Optional[bool] = False
 
-# Campaign List Member schemas
+# Campaign List Member schemas - UPDATED
 class CampaignListMemberBase(BaseModel):
     list_id: str
     platform_id: str
@@ -74,6 +74,8 @@ class CampaignListMemberBase(BaseModel):
     contact_attempts: int = 0
     next_contact_at: Optional[datetime] = None
     collaboration_price: Optional[float] = None
+    ready_to_onboard: bool = False  # New field
+    notes: Optional[str] = None  # New field
 
 class CampaignListMemberCreate(CampaignListMemberBase):
     # Optional field for social data
@@ -102,6 +104,8 @@ class CampaignListMemberUpdate(BaseModel):
     contact_attempts: Optional[int] = None
     next_contact_at: Optional[datetime] = None
     collaboration_price: Optional[float] = None
+    ready_to_onboard: Optional[bool] = None  # New field
+    notes: Optional[str] = None  # New field
 
 class CampaignListMemberResponse(BaseModel):
     id: str
@@ -114,7 +118,9 @@ class CampaignListMemberResponse(BaseModel):
     collaboration_price: Optional[float] = None
     last_contacted_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None
+    ready_to_onboard: bool  # New field
     onboarded_at: Optional[datetime] = None
+    notes: Optional[str] = None  # New field
     created_at: datetime
     updated_at: datetime
     
@@ -131,9 +137,8 @@ class CampaignListMemberResponse(BaseModel):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
-    
 
-# Add pagination schema
+# Keep existing pagination schemas
 class PaginationInfo(BaseModel):
     page: int
     page_size: int

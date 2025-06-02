@@ -499,7 +499,7 @@ DEFAULT_PLATFORMS = [
         "name": "Instagram Direct",
         "logo_url": "https://cdn.getphyllo.com/platforms_logo/logos/logo_instagram_direct.png",
         "category": "SOCIAL",
-        "status": "ACTIVE",
+        "status": "INACTIVE",
         "url": "https://www.instagram.com/",
         "provider": "phyllo",
         "work_platform_id": "d3badb09-a81f-4444-bc27-1a994d939e00",

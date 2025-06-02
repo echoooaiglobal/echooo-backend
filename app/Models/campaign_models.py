@@ -42,6 +42,7 @@ class Agent(Base):
     assigned_to_user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # FK -> users.id (User who will handle manual fallback)
     is_available = Column(Boolean, nullable=False, default=True)  # Whether agent is available for assignment
     current_assignment_id = Column(UUID(as_uuid=True), ForeignKey('list_assignments.id', ondelete='SET NULL'), nullable=True)  # FK -> list_assignments.id. Ongoing assignment.
+    status_id = Column(UUID(as_uuid=True), ForeignKey('statuses.id', ondelete='SET NULL'), nullable=True)  # New field - agent status
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -50,6 +51,7 @@ class Agent(Base):
     assigned_to_user = relationship("User", foreign_keys=[assigned_to_user_id])
     current_assignment = relationship("ListAssignment", foreign_keys=[current_assignment_id])
     assignments = relationship("ListAssignment", back_populates="agent", foreign_keys="ListAssignment.agent_id")
+    status = relationship("Status", foreign_keys=[status_id])  # New relationship
 
 class Campaign(Base):
     __tablename__ = 'campaigns'
@@ -91,6 +93,7 @@ class CampaignList(Base):
     description = Column(Text, nullable=True)
     message_template_id = Column(UUID(as_uuid=True), ForeignKey('message_templates.id', ondelete='SET NULL'), nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='SET NULL'), nullable=False)
+    notes = Column(Text, nullable=True)  # New field before created_at
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

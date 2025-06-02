@@ -10,7 +10,7 @@ from app.Models import (
 )
 
 # Import dictionary data
-from app.Utils.dictionaries import DEFAULT_CATEGORIES, DEFAULT_PLATFORMS
+from app.Utils.dictionaries import DEFAULT_CATEGORIES, DEFAULT_PLATFORMS, DEFAULT_STATUSES, DEFAULT_MESSAGE_CHANNNELS, DEFAULT_ROLES, DEFAULT_PERMISSIONS
 
 def initialize_default_roles_permissions(db: Session):
     """
@@ -18,57 +18,14 @@ def initialize_default_roles_permissions(db: Session):
     """
     try:
         # Create default roles if they don't exist
-        default_roles = [
-            # influencer-specific roles
-            {"name": "influencer", "description": "Influencer user"},
-            {"name": "influencer_manager", "description": "Influencer manager"},
-            
-            # platform-specific roles
-            {"name": "platform_admin", "description": "Platform administrator with full access"},
-            {"name": "platform_user", "description": "Platform staff member"},
-            {"name": "platform_manager", "description": "Platform manager with oversight across functions"},
-            {"name": "platform_accountant", "description": "Handles platform financial matters"},
-            {"name": "platform_developer", "description": "Technical developer role for platform"},
-            {"name": "platform_customer_support", "description": "Customer support agent for platform"},
-            {"name": "platform_content_moderator", "description": "Content moderation role for platform"},
-            {"name": "platform_agent", "description": "Agent handeling company campaigns lists"},
-            
-            # company-specific roles
-            {"name": "company_admin", "description": "Company administrator"},
-            {"name": "company_user", "description": "Company user"},
-            {"name": "company_manager", "description": "Manager role within a company"},
-            {"name": "company_accountant", "description": "Handles company financial matters"},
-            {"name": "company_marketer", "description": "Marketing specialist for company"},
-            {"name": "company_content_creator", "description": "Content creation role for company"}
-        ]
-        
-        for role_data in default_roles:
+        for role_data in DEFAULT_ROLES:
             role = db.query(Role).filter(Role.name == role_data["name"]).first()
             if not role:
                 role = Role(**role_data)
                 db.add(role)
         
         # Create default permissions
-        default_permissions = [
-            {"name": "user:create", "description": "Create users"},
-            {"name": "user:read", "description": "Read user details"},
-            {"name": "user:update", "description": "Update user details"},
-            {"name": "user:delete", "description": "Delete users"},
-            {"name": "company:create", "description": "Create companies"},
-            {"name": "company:read", "description": "Read company details"},
-            {"name": "company:update", "description": "Update company details"},
-            {"name": "company:delete", "description": "Delete companies"},
-            {"name": "campaign:create", "description": "Create campaigns"},
-            {"name": "campaign:read", "description": "Read campaign details"},
-            {"name": "campaign:update", "description": "Update campaign details"},
-            {"name": "campaign:delete", "description": "Delete campaigns"},
-            {"name": "influencer:create", "description": "Create influencer profiles"},
-            {"name": "influencer:read", "description": "Read influencer details"},
-            {"name": "influencer:update", "description": "Update influencer details"},
-            {"name": "influencer:delete", "description": "Delete influencer profiles"}
-        ]
-        
-        for perm_data in default_permissions:
+        for perm_data in DEFAULT_PERMISSIONS:
             perm = db.query(Permission).filter(Permission.name == perm_data["name"]).first()
             if not perm:
                 perm = Permission(**perm_data)
@@ -359,39 +316,8 @@ def initialize_default_roles_permissions(db: Session):
                 category = Category(**category_data)
                 db.add(category)
         
-
-        # Initialize default statuses
-        default_statuses = [
-            # list_member statuses
-            {"model": "list_member", "name": "discovered"},
-            {"model": "list_member", "name": "contacted"},
-            {"model": "list_member", "name": "responded"},
-            {"model": "list_member", "name": "negotiating"},
-            {"model": "list_member", "name": "onboarded"},
-            {"model": "list_member", "name": "declined"},
-            
-            # outreach statuses
-            {"model": "outreach", "name": "sent"},
-            {"model": "outreach", "name": "delivered"},
-            {"model": "outreach", "name": "read"},
-            {"model": "outreach", "name": "failed"},
-
-            # campaign statuses
-            {"model": "campaign", "name": "draft"},
-            {"model": "campaign", "name": "planning"},
-            {"model": "campaign", "name": "active"},
-            {"model": "campaign", "name": "paused"},
-            {"model": "campaign", "name": "completed"},
-            {"model": "campaign", "name": "cancelled"},
-            
-            # list_assignment statuses
-            {"model": "list_assignment", "name": "pending"},
-            {"model": "list_assignment", "name": "active"},
-            {"model": "list_assignment", "name": "completed"},
-            {"model": "list_assignment", "name": "failed"}
-        ]
-
-        for status_data in default_statuses:
+         # Initialize statuses from dictionary
+        for status_data in DEFAULT_STATUSES:
             status = db.query(Status).filter(
                 Status.model == status_data["model"],
                 Status.name == status_data["name"]
@@ -400,17 +326,8 @@ def initialize_default_roles_permissions(db: Session):
                 status = Status(**status_data)
                 db.add(status)
 
-        # Initialize default message channels
-        default_channels = [
-            {"name": "Direct Message", "shortname": "DM"},
-            {"name": "Story Mention", "shortname": "Story"},
-            {"name": "Highlight", "shortname": "HL"},
-            {"name": "Comment", "shortname": "Comment"},
-            {"name": "Email", "shortname": "Email"},
-            {"name": "WhatsApp", "shortname": "WhatsApp"}
-        ]
-
-        for channel_data in default_channels:
+        # Initialize default message channels from dictionary
+        for channel_data in DEFAULT_MESSAGE_CHANNNELS:
             channel = db.query(MessageChannel).filter(MessageChannel.shortname == channel_data["shortname"]).first()
             if not channel:
                 channel = MessageChannel(**channel_data)
