@@ -7,7 +7,8 @@ import uuid
 from app.Http.Controllers.ListAssignmentController import ListAssignmentController
 from app.Models.auth_models import User
 from app.Schemas.campaign import (
-    ListAssignmentCreate, ListAssignmentUpdate, ListAssignmentResponse
+    ListAssignmentCreate, ListAssignmentUpdate, ListAssignmentResponse,
+    ListAssignmentStatusUpdate
 )
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission
@@ -57,7 +58,13 @@ async def create_assignment(
     current_user: User = Depends(has_permission("campaign:update")),
     db: Session = Depends(get_db)
 ):
-    """Create a new list assignment"""
+    """
+    Create a new list assignment
+    
+    - If agent_id is provided, assigns that specific agent
+    - If agent_id is not provided, automatically assigns an available agent
+    - If status_id is not provided, defaults to 'pending' status
+    """
     return await ListAssignmentController.create_assignment(assignment_data, current_user, db)
 
 @router.put("/{assignment_id}", response_model=ListAssignmentResponse)
@@ -67,8 +74,47 @@ async def update_assignment(
     current_user: User = Depends(has_permission("campaign:update")),
     db: Session = Depends(get_db)
 ):
-    """Update a list assignment"""
+    """Update a list assignment (including status changes)"""
     return await ListAssignmentController.update_assignment(assignment_id, assignment_data, db)
+
+@router.patch("/{assignment_id}/status", response_model=ListAssignmentResponse)
+async def update_assignment_status(
+    assignment_id: uuid.UUID,
+    status_data: ListAssignmentStatusUpdate,
+    current_user: User = Depends(has_permission("campaign:update")),
+    db: Session = Depends(get_db)
+):
+    """
+    Update assignment status specifically
+    
+    This endpoint handles status transitions and agent availability:
+    - 'active': Makes assignment active, marks agent as unavailable
+    - 'inactive': Makes assignment inactive, marks agent as available  
+    - 'completed': Completes assignment, frees up agent
+    - 'failed': Fails assignment, frees up agent
+    - 'pending': Sets assignment to pending
+    """
+    return await ListAssignmentController.update_assignment_status(
+        assignment_id, status_data.status_id, db
+    )
+
+@router.post("/{assignment_id}/activate", response_model=ListAssignmentResponse)
+async def activate_assignment(
+    assignment_id: uuid.UUID,
+    current_user: User = Depends(has_permission("campaign:update")),
+    db: Session = Depends(get_db)
+):
+    """Activate an assignment (convenience endpoint)"""
+    return await ListAssignmentController.activate_assignment(assignment_id, db)
+
+@router.post("/{assignment_id}/deactivate", response_model=ListAssignmentResponse)
+async def deactivate_assignment(
+    assignment_id: uuid.UUID,
+    current_user: User = Depends(has_permission("campaign:update")),
+    db: Session = Depends(get_db)
+):
+    """Deactivate an assignment (convenience endpoint)"""
+    return await ListAssignmentController.deactivate_assignment(assignment_id, db)
 
 @router.post("/{assignment_id}/complete", response_model=ListAssignmentResponse)
 async def complete_assignment(

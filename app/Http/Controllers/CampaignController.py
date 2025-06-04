@@ -8,7 +8,7 @@ from app.Models.auth_models import User
 from app.Models.campaign_models import Campaign, CampaignList
 from app.Schemas.campaign import (
     CampaignCreate, CampaignUpdate, CampaignResponse, CategoryBrief, StatusBrief,
-    CampaignListCreate, CampaignListResponse, CampaignListUpdate, CampaignListBrief,
+    CampaignListCreate, CampaignListResponse, CampaignListUpdate, CampaignListBrief,ListAssignmentBrief
 )
 
 from app.Services.CampaignService import CampaignService
@@ -105,12 +105,36 @@ class CampaignController:
         if campaign.status:
             response.status = StatusBrief.model_validate(campaign.status)
         
-        # Add campaign lists if available - update the property name
-        if campaign.campaign_lists:  # Assuming the relationship name is still "campaign_lists"
+        # Add campaign lists if available
+        if campaign.campaign_lists:
             response.campaign_lists = [
                 CampaignListBrief.model_validate(list_obj) 
                 for list_obj in campaign.campaign_lists
             ]
+        
+        # Add message templates if available
+        if campaign.message_templates:
+            from app.Schemas.campaign import MessageTemplatesBrief
+            response.message_templates = [
+                MessageTemplatesBrief.model_validate(template) 
+                for template in campaign.message_templates
+            ]
+        
+        # Add list assignments - collect from all campaign lists
+        list_assignments = []
+        if campaign.campaign_lists:
+            for campaign_list in campaign.campaign_lists:
+                if campaign_list.assignments:
+                    for assignment in campaign_list.assignments:
+                        assignment_brief = ListAssignmentBrief.model_validate(assignment)
+                        
+                        # Add status details if available
+                        if assignment.status:
+                            assignment_brief.status = StatusBrief.model_validate(assignment.status)
+                        
+                        list_assignments.append(assignment_brief)
+        
+        response.list_assignments = list_assignments
         
         return response
     

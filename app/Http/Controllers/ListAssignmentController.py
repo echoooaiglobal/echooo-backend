@@ -60,7 +60,10 @@ class ListAssignmentController:
         current_user: User,
         db: Session
     ):
-        """Create a new list assignment"""
+        """
+        Create a new list assignment
+        Auto-assigns available agent if agent_id not provided
+        """
         try:
             assignment = await ListAssignmentService.create_assignment(
                 assignment_data.model_dump(exclude_unset=True),
@@ -87,6 +90,85 @@ class ListAssignmentController:
             return ListAssignmentResponse.model_validate(assignment)
         except Exception as e:
             logger.error(f"Error in update_assignment controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def update_assignment_status(
+        assignment_id: uuid.UUID,
+        status_id: str,
+        db: Session
+    ):
+        """Update assignment status specifically"""
+        try:
+            # Convert string to UUID if needed
+            # status_uuid = uuid.UUID(status_id) if isinstance(status_id, str) else status_id
+            
+            assignment = await ListAssignmentService.update_assignment_status(
+                assignment_id, status_id, db
+            )
+            return ListAssignmentResponse.model_validate(assignment)
+        except Exception as e:
+            logger.error(f"Error in update_assignment_status controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def activate_assignment(assignment_id: uuid.UUID, db: Session):
+        """Activate an assignment (convenience method)"""
+        try:
+            from app.Models.campaign_models import Status
+            
+            # Find active status
+            active_status = db.query(Status).filter(
+                Status.model == "list_assignment",
+                Status.name == "active"
+            ).first()
+            
+            if not active_status:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Active status not found for list assignments"
+                )
+            
+            assignment = await ListAssignmentService.update_assignment_status(
+                assignment_id, active_status.id, db
+            )
+            return ListAssignmentResponse.model_validate(assignment)
+        except Exception as e:
+            logger.error(f"Error in activate_assignment controller: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def deactivate_assignment(assignment_id: uuid.UUID, db: Session):
+        """Deactivate an assignment (convenience method)"""
+        try:
+            from app.Models.campaign_models import Status
+            
+            # Find inactive status
+            inactive_status = db.query(Status).filter(
+                Status.model == "list_assignment",
+                Status.name == "inactive"
+            ).first()
+            
+            if not inactive_status:
+                # If inactive status doesn't exist, create it or use pending
+                pending_status = db.query(Status).filter(
+                    Status.model == "list_assignment",
+                    Status.name == "pending"
+                ).first()
+                
+                if not pending_status:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="No suitable inactive/pending status found for list assignments"
+                    )
+                inactive_status = pending_status
+            
+            assignment = await ListAssignmentService.update_assignment_status(
+                assignment_id, inactive_status.id, db
+            )
+            return ListAssignmentResponse.model_validate(assignment)
+        except Exception as e:
+            logger.error(f"Error in deactivate_assignment controller: {str(e)}")
             raise
     
     @staticmethod

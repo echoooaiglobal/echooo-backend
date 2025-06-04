@@ -8,9 +8,7 @@ from app.Http.Controllers.AssignmentController import AssignmentController
 from app.Models.auth_models import User
 from app.Schemas.assignment import AssignmentsResponse
 from app.Schemas.campaign_list_member import CampaignListMembersPaginatedResponse
-from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
-)
+from app.Utils.Helpers import get_current_active_user
 from config.database import get_db
 
 router = APIRouter(prefix="/assignments", tags=["Assignments"])

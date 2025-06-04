@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
-from app.Models.campaign_models import Campaign, CampaignList, Status
+from app.Models.campaign_models import Campaign, CampaignList, Status, ListAssignment
 from app.Models.support_models import Category
 from app.Utils.Logger import logger
 import uuid
@@ -15,57 +15,43 @@ class CampaignService:
     @staticmethod
     async def get_all_campaigns(db: Session):
         """
-        Get all campaigns
-        
-        Args:
-            db: Database session
-            
-        Returns:
-            List[Campaign]: List of all campaigns
+        Get all campaigns with all related data including list assignments
         """
-        # Use joinedload to eagerly load category, status, and campaign_lists relationships
         return db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
-            joinedload(Campaign.campaign_lists)
+            joinedload(Campaign.campaign_lists),
+            joinedload(Campaign.message_templates),
+            # Add nested loading for list assignments through campaign lists
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
         ).all()
-    
+
     @staticmethod
     async def get_company_campaigns(company_id: uuid.UUID, db: Session):
         """
-        Get all campaigns for a specific company
-        
-        Args:
-            company_id: ID of the company
-            db: Database session
-            
-        Returns:
-            List[Campaign]: List of company campaigns
+        Get all campaigns for a specific company with all related data
         """
-        # Use joinedload to eagerly load category, status, and campaign_lists relationships
         return db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
-            joinedload(Campaign.campaign_lists)
+            joinedload(Campaign.campaign_lists),
+            joinedload(Campaign.message_templates),
+            # Add nested loading for list assignments
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
         ).filter(Campaign.company_id == company_id).all()
-    
+
     @staticmethod
     async def get_campaign_by_id(campaign_id: uuid.UUID, db: Session):
         """
-        Get a campaign by ID
-        
-        Args:
-            campaign_id: ID of the campaign
-            db: Database session
-            
-        Returns:
-            Campaign: The campaign if found
+        Get a campaign by ID with all related data
         """
-        # Use joinedload to eagerly load category, status, and campaign_lists relationships
         campaign = db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
-            joinedload(Campaign.campaign_lists)
+            joinedload(Campaign.campaign_lists),
+            joinedload(Campaign.message_templates),
+            # Add nested loading for list assignments
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
         ).filter(Campaign.id == campaign_id).first()
         
         if not campaign:
