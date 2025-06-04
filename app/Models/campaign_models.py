@@ -83,6 +83,14 @@ class Campaign(Base):
     status = relationship("Status", foreign_keys=[status_id])  # New relationship for status
     campaign_lists = relationship("CampaignList", back_populates="campaign", cascade="all, delete-orphan")
     message_templates = relationship("MessageTemplate", back_populates="campaign", cascade="all, delete-orphan")
+
+    @property
+    def all_list_assignments(self):
+        """Get all list assignments for this campaign through campaign lists"""
+        assignments = []
+        for campaign_list in self.campaign_lists:
+            assignments.extend(campaign_list.assignments)
+        return assignments
     
 class CampaignList(Base):
     __tablename__ = 'campaign_lists'

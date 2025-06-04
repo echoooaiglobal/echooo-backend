@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 import uuid
-from app.Models.campaign_models import ListAssignment, CampaignList, Agent
+from app.Models.campaign_models import ListAssignment, CampaignList, Agent, Status
 from app.Utils.Logger import logger
 
 class ListAssignmentService:
@@ -74,9 +74,34 @@ class ListAssignmentService:
         return assignment
     
     @staticmethod
+    async def find_available_agent(db: Session, platform_id: Optional[uuid.UUID] = None):
+        """
+        Find an available agent, optionally filtered by platform
+        
+        Args:
+            db: Database session
+            platform_id: Optional platform ID to filter agents
+            
+        Returns:
+            Agent: Available agent if found, None otherwise
+        """
+        query = db.query(Agent).filter(
+            Agent.is_available == True,
+            Agent.current_assignment_id == None
+        )
+        
+        # If platform_id is provided, filter by platform
+        if platform_id:
+            query = query.filter(Agent.platform_id == platform_id)
+        
+        # Return the first available agent
+        return query.first()
+    
+    @staticmethod
     async def create_assignment(assignment_data: Dict[str, Any], db: Session):
         """
         Create a new list assignment
+        Auto-assigns available agent if agent_id is not provided
         
         Args:
             assignment_data: Assignment data
@@ -88,36 +113,71 @@ class ListAssignmentService:
         try:
             # Validate list exists
             list_id = assignment_data.get('list_id')
-            if list_id:
-                campaign_list = db.query(CampaignList).filter(CampaignList.id == list_id).first()
-                if not campaign_list:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Campaign list not found"
-                    )
+            if not list_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="list_id is required"
+                )
             
-            # Validate agent exists and is available
+            campaign_list = db.query(CampaignList).filter(CampaignList.id == list_id).first()
+            if not campaign_list:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Campaign list not found"
+                )
+            
+            # Handle agent assignment
             agent_id = assignment_data.get('agent_id')
+            agent = None
+            
             if agent_id:
+                # Specific agent requested
                 agent = db.query(Agent).filter(Agent.id == agent_id).first()
                 if not agent:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Agent not found"
+                        detail="Specified agent not found"
                     )
                 
                 if not agent.is_available:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Agent is not available for assignment"
+                        detail="Specified agent is not available for assignment"
                     )
                 
-                # Check if agent already has an active assignment
                 if agent.current_assignment_id:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Agent already has an active assignment"
+                        detail="Specified agent already has an active assignment"
                     )
+            else:
+                # Auto-assign available agent
+                # Try to find agent for the same platform as the campaign list
+                # You might need to determine platform from list members or campaign settings
+                agent = await ListAssignmentService.find_available_agent(db)
+                
+                if not agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="No available agents found for assignment"
+                    )
+                
+                assignment_data['agent_id'] = agent.id
+            
+            # Set default status if not provided
+            if 'status_id' not in assignment_data or not assignment_data['status_id']:
+                default_status = db.query(Status).filter(
+                    Status.model == "list_assignment",
+                    Status.name == "pending"
+                ).first()
+                
+                if not default_status:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Default 'pending' status not found for list assignments"
+                    )
+                
+                assignment_data['status_id'] = default_status.id
             
             # Create assignment
             assignment = ListAssignment(**assignment_data)
@@ -126,14 +186,16 @@ class ListAssignmentService:
             db.commit()
             
             # Update agent's current assignment
-            if agent:
-                agent.current_assignment_id = assignment.id
-                agent.is_available = False
-                db.commit()
+            agent.current_assignment_id = assignment.id
+            agent.is_available = False
+            db.commit()
             
             db.refresh(assignment)
             
+            logger.info(f"Assignment created: {assignment.id} for list {list_id} with agent {agent.id}")
+            
             return assignment
+            
         except HTTPException:
             db.rollback()
             raise
@@ -143,6 +205,91 @@ class ListAssignmentService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error creating list assignment"
+            ) from e
+    
+    @staticmethod
+    async def update_assignment_status(
+        assignment_id: uuid.UUID,
+        status_id: uuid.UUID,
+        db: Session
+    ):
+        """
+        Update assignment status
+        
+        Args:
+            assignment_id: ID of the assignment
+            status_id: New status ID
+            db: Database session
+            
+        Returns:
+            ListAssignment: The updated assignment
+        """
+        try:
+            assignment = db.query(ListAssignment).filter(ListAssignment.id == assignment_id).first()
+            
+            if not assignment:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Assignment not found"
+                )
+            
+            # Validate status exists and is for list_assignment model
+            new_status = db.query(Status).filter(
+                Status.id == status_id,
+                Status.model == "list_assignment"
+            ).first()
+            
+            if not new_status:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid status for list assignment"
+                )
+            
+            old_status_name = None
+            if assignment.status_id:
+                old_status = db.query(Status).filter(Status.id == assignment.status_id).first()
+                old_status_name = old_status.name if old_status else None
+            
+            # Update assignment status
+            assignment.status_id = status_id
+            
+            # Handle agent availability based on status change
+            agent = db.query(Agent).filter(Agent.id == assignment.agent_id).first()
+            
+            if agent and agent.current_assignment_id == assignment.id:
+                # If status is changing to 'completed' or 'failed', free up the agent
+                if new_status.name in ['completed', 'failed']:
+                    agent.current_assignment_id = None
+                    agent.is_available = True
+                    logger.info(f"Agent {agent.id} freed from assignment {assignment.id}")
+                
+                # If status is changing to 'active' from 'pending' or 'inactive'
+                elif new_status.name == 'active' and old_status_name in ['pending', 'inactive']:
+                    agent.is_available = False
+                    logger.info(f"Agent {agent.id} activated for assignment {assignment.id}")
+                
+                # If status is changing to 'inactive'
+                elif new_status.name == 'inactive':
+                    # Keep the assignment but mark agent as available for other tasks
+                    agent.is_available = True
+                    logger.info(f"Assignment {assignment.id} set to inactive, agent {agent.id} available")
+            
+            db.commit()
+            db.refresh(assignment)
+            
+            logger.info(f"Assignment {assignment.id} status updated to {new_status.name}")
+            
+            return assignment
+            
+        except HTTPException:
+            db.rollback()
+            raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Error updating assignment status: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error updating assignment status"
             ) from e
     
     @staticmethod
@@ -171,28 +318,24 @@ class ListAssignmentService:
                     detail="Assignment not found"
                 )
             
-            # Handle status changes
-            if 'status_id' in update_data and update_data['status_id'] != assignment.status_id:
-                # Get current agent
-                agent = db.query(Agent).filter(Agent.id == assignment.agent_id).first()
-                
-                # If status is being changed to 'completed' or 'failed', free up the agent
-                if agent and agent.current_assignment_id == assignment.id:
-                    # Check if the new status is 'completed' or 'failed'
-                    # This would need to be extended to check specific status IDs or names
-                    if 'status_name' in update_data and update_data['status_name'] in ['completed', 'failed']:
-                        agent.current_assignment_id = None
-                        agent.is_available = True
+            # If status_id is being updated, use the dedicated status update method
+            if 'status_id' in update_data and update_data['status_id']:
+                status_id = uuid.UUID(update_data['status_id']) if isinstance(update_data['status_id'], str) else update_data['status_id']
+                return await ListAssignmentService.update_assignment_status(assignment_id, status_id, db)
             
-            # Update fields
+            # Update other fields
             for key, value in update_data.items():
-                if hasattr(assignment, key) and value is not None:
+                if hasattr(assignment, key) and value is not None and key != 'status_id':
                     setattr(assignment, key, value)
             
             db.commit()
             db.refresh(assignment)
             
             return assignment
+            
+        except HTTPException:
+            db.rollback()
+            raise
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error updating list assignment: {str(e)}")
@@ -214,18 +357,9 @@ class ListAssignmentService:
             ListAssignment: The updated assignment
         """
         try:
-            assignment = db.query(ListAssignment).filter(ListAssignment.id == assignment_id).first()
-            
-            if not assignment:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Assignment not found"
-                )
-            
-            # Get completed status for assignment
-            completed_status = db.query('Status').filter(
-                'Status.model' == 'list_assignment',
-                'Status.name' == 'completed'
+            completed_status = db.query(Status).filter(
+                Status.model == 'list_assignment',
+                Status.name == 'completed'
             ).first()
             
             if not completed_status:
@@ -234,26 +368,13 @@ class ListAssignmentService:
                     detail="Completed status not found"
                 )
             
-            # Update assignment status
-            assignment.status_id = completed_status.id
+            return await ListAssignmentService.update_assignment_status(
+                assignment_id, completed_status.id, db
+            )
             
-            # Free up agent
-            agent = db.query(Agent).filter(Agent.id == assignment.agent_id).first()
-            if agent and agent.current_assignment_id == assignment.id:
-                agent.current_assignment_id = None
-                agent.is_available = True
-            
-            db.commit()
-            db.refresh(assignment)
-            
-            return assignment
-        except SQLAlchemyError as e:
-            db.rollback()
+        except Exception as e:
             logger.error(f"Error completing list assignment: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error completing list assignment"
-            ) from e
+            raise
     
     @staticmethod
     async def fail_assignment(assignment_id: uuid.UUID, reason: str, db: Session):
@@ -269,18 +390,9 @@ class ListAssignmentService:
             ListAssignment: The updated assignment
         """
         try:
-            assignment = db.query(ListAssignment).filter(ListAssignment.id == assignment_id).first()
-            
-            if not assignment:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Assignment not found"
-                )
-            
-            # Get failed status for assignment
-            failed_status = db.query('Status').filter(
-                'Status.model' == 'list_assignment',
-                'Status.name' == 'failed'
+            failed_status = db.query(Status).filter(
+                Status.model == 'list_assignment',
+                Status.name == 'failed'
             ).first()
             
             if not failed_status:
@@ -289,29 +401,22 @@ class ListAssignmentService:
                     detail="Failed status not found"
                 )
             
-            # Update assignment status
-            assignment.status_id = failed_status.id
+            # Update the assignment status first
+            assignment = await ListAssignmentService.update_assignment_status(
+                assignment_id, failed_status.id, db
+            )
+            
             # Add failure reason if model has such field
             if hasattr(assignment, 'failure_reason'):
                 assignment.failure_reason = reason
-            
-            # Free up agent
-            agent = db.query(Agent).filter(Agent.id == assignment.agent_id).first()
-            if agent and agent.current_assignment_id == assignment.id:
-                agent.current_assignment_id = None
-                agent.is_available = True
-            
-            db.commit()
-            db.refresh(assignment)
+                db.commit()
+                db.refresh(assignment)
             
             return assignment
-        except SQLAlchemyError as e:
-            db.rollback()
+            
+        except Exception as e:
             logger.error(f"Error failing list assignment: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error failing list assignment"
-            ) from e
+            raise
     
     @staticmethod
     async def delete_assignment(assignment_id: uuid.UUID, db: Session):
@@ -347,7 +452,13 @@ class ListAssignmentService:
             db.delete(assignment)
             db.commit()
             
+            logger.info(f"Assignment {assignment_id} deleted successfully")
+            
             return True
+            
+        except HTTPException:
+            db.rollback()
+            raise
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error deleting list assignment: {str(e)}")

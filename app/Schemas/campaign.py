@@ -161,6 +161,45 @@ class CampaignListBrief(BaseModel):
             return str(v)
         return v   
 
+class MessageTemplatesBrief(BaseModel):
+    id: str
+    subject: str
+    content: str
+    company_id: str
+    campaign_id: str
+    is_global: bool = False
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {"from_attributes": True}
+    
+    @field_validator('id', 'company_id', 'campaign_id', 'created_by', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
+class ListAssignmentBrief(BaseModel):
+    id: str
+    list_id: str
+    agent_id: str
+    status_id: str
+    created_at: datetime
+    updated_at: datetime
+    
+    status: Optional[StatusBrief] = None
+    
+    model_config = {"from_attributes": True}
+    
+    @field_validator('id', 'list_id', 'agent_id', 'status_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
 class CampaignResponse(CampaignBase):
     id: str  # UUID as string
     created_by: str  # FK -> users.id
@@ -169,7 +208,8 @@ class CampaignResponse(CampaignBase):
     category: Optional[CategoryBrief] = None  # Include category info
     status: Optional[StatusBrief] = None  # Include status info
     campaign_lists: List[CampaignListBrief] = []  # Include influencer lists
-    
+    message_templates: List[MessageTemplatesBrief] = []
+    list_assignments: List[ListAssignmentBrief] = []
     model_config = {"from_attributes": True}
     
     @field_validator('id', 'company_id', 'created_by', 'category_id', 'status_id', mode='before')
@@ -242,20 +282,31 @@ class CampaignListResponse(CampaignListBase):
 
 # ListAssignment schemas
 class ListAssignmentBase(BaseModel):
-    list_id: str  # FK -> influencer_lists.id
-    agent_id: str  # FK -> agents.id
-    status_id: str  # FK -> statuses.id
+    list_id: str  # FK -> campaign_lists.id (required)
+    agent_id: Optional[str] = None  # FK -> agents.id (optional - will auto-assign if not provided)
+    status_id: Optional[str] = None  # FK -> statuses.id (optional - will default to 'pending')
 
 class ListAssignmentCreate(ListAssignmentBase):
     pass
 
 class ListAssignmentUpdate(BaseModel):
     status_id: Optional[str] = None
+    agent_id: Optional[str] = None
 
-class ListAssignmentResponse(ListAssignmentBase):
+class ListAssignmentStatusUpdate(BaseModel):
+    """Schema specifically for status updates"""
+    status_id: str  # Required when updating status
+
+class ListAssignmentResponse(BaseModel):
     id: str  # UUID as string
+    list_id: str
+    agent_id: str
+    status_id: str
     created_at: datetime
     updated_at: datetime
+    
+    # Include related data
+    status: Optional[StatusBrief] = None
     
     model_config = {"from_attributes": True}
     

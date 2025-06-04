@@ -31,8 +31,11 @@ DEFAULT_STATUSES = [
     # list_assignment statuses
     {"model": "list_assignment", "name": "pending"},
     {"model": "list_assignment", "name": "active"},
+    {"model": "list_assignment", "name": "paused"},
     {"model": "list_assignment", "name": "completed"},
     {"model": "list_assignment", "name": "failed"},
+    {"model": "list_assignment", "name": "cancelled"},
+    {"model": "list_assignment", "name": "expired"},
     
     # NEW: agent statuses
     {"model": "agent", "name": "active"},
