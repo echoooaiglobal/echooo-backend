@@ -6,13 +6,18 @@ Default statuses for the influencer marketing platform
 
 DEFAULT_STATUSES = [
     # list_member statuses
-    {"model": "list_member", "name": "discovered"},
-    {"model": "list_member", "name": "contacted"},
-    {"model": "list_member", "name": "responded"},
-    {"model": "list_member", "name": "negotiating"},
-    {"model": "list_member", "name": "onboarded"},
-    {"model": "list_member", "name": "accepted"},
-    {"model": "list_member", "name": "declined"},
+    { "model": "list_member", "name": "discovered" },
+    { "model": "list_member", "name": "unreachable" },
+    { "model": "list_member", "name": "contacted" },
+    { "model": "list_member", "name": "responded" },
+    { "model": "list_member", "name": "info_requested" },
+    { "model": "list_member", "name": "info_received" },
+    { "model": "list_member", "name": "ready_for_onboarding" },
+    { "model": "list_member", "name": "negotiating" },
+    { "model": "list_member", "name": "accepted" },
+    { "model": "list_member", "name": "onboarded" },
+    { "model": "list_member", "name": "declined" },
+    { "model": "list_member", "name": "inactive" },
     
     # outreach statuses
     {"model": "outreach", "name": "sent"},
