@@ -2,6 +2,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func
 from typing import List, Dict, Any
 import uuid
 
@@ -25,17 +26,165 @@ class RoleController:
             
             result = []
             for role in roles:
-                role_data = RoleDetailResponse.model_validate(role)
-                role_data.permissions = [
-                    PermissionResponse.model_validate(rp.permission) 
-                    for rp in role.permissions
-                ]
-                result.append(role_data)
+                try:
+                    # Create role data first
+                    role_data = RoleDetailResponse.model_validate(role)
+                    
+                    # Handle permissions properly
+                    permissions = []
+                    if hasattr(role, 'permissions') and role.permissions:
+                        for role_permission in role.permissions:
+                            if hasattr(role_permission, 'permission') and role_permission.permission:
+                                perm_response = PermissionResponse.model_validate(role_permission.permission)
+                                permissions.append(perm_response)
+                    
+                    role_data.permissions = permissions
+                    result.append(role_data)
+                    
+                except Exception as validation_error:
+                    logger.error(f"Error validating role {role.name}: {str(validation_error)}")
+                    # Create a minimal role response if validation fails
+                    role_data = RoleDetailResponse(
+                        id=str(role.id),
+                        name=role.name,
+                        description=role.description or "",
+                        permissions=[]
+                    )
+                    result.append(role_data)
             
             return result
         except Exception as e:
             logger.error(f"Error in get_all_roles controller: {str(e)}")
             raise
+    
+    @staticmethod
+    async def get_roles_by_user_type(user_type: str, db: Session):
+        """Get roles filtered by user type"""
+        try:
+            # Define role patterns for each user type
+            role_patterns = {
+                "platform": ["platform_admin", "platform_user", "platform_manager", 
+                           "platform_accountant", "platform_developer", "platform_customer_support", 
+                           "platform_content_moderator", "platform_agent"],
+                "company": ["company_admin", "company_user", "company_manager", 
+                          "company_accountant", "company_marketer", "company_content_creator"],
+                "influencer": ["influencer", "influencer_manager"]
+            }
+            
+            if user_type not in role_patterns:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid user_type: {user_type}"
+                )
+            
+            role_names = role_patterns[user_type]
+            
+            # Build query with OR conditions for role name patterns
+            query = db.query(Role).options(
+                joinedload(Role.permissions).joinedload(RolePermission.permission)
+            )
+            
+            # Create filter conditions using role names or LIKE patterns
+            conditions = []
+            for role_name in role_names:
+                conditions.append(Role.name == role_name)
+            
+            # Also add LIKE patterns for user_type prefix
+            conditions.append(Role.name.like(f"{user_type}_%"))
+            
+            # Apply OR conditions
+            if conditions:
+                from sqlalchemy import or_
+                query = query.filter(or_(*conditions))
+            
+            roles = query.all()
+            
+            result = []
+            for role in roles:
+                try:
+                    # Create role data first
+                    role_data = RoleDetailResponse.model_validate(role)
+                    
+                    # Handle permissions properly
+                    permissions = []
+                    if hasattr(role, 'permissions') and role.permissions:
+                        for role_permission in role.permissions:
+                            if hasattr(role_permission, 'permission') and role_permission.permission:
+                                perm_response = PermissionResponse.model_validate(role_permission.permission)
+                                permissions.append(perm_response)
+                    
+                    role_data.permissions = permissions
+                    result.append(role_data)
+                    
+                except Exception as validation_error:
+                    logger.error(f"Error validating role {role.name}: {str(validation_error)}")
+                    # Create a minimal role response if validation fails
+                    role_data = RoleDetailResponse(
+                        id=str(role.id),
+                        name=role.name,
+                        description=role.description or "",
+                        permissions=[]
+                    )
+                    result.append(role_data)
+            
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in get_roles_by_user_type controller: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error retrieving roles by user type"
+            )
+    
+    @staticmethod
+    async def get_user_types_with_role_counts(db: Session):
+        """Get user types with their role counts"""
+        try:
+            # Define role patterns for each user type
+            user_types = {
+                "platform": ["platform_%"],
+                "company": ["company_%"], 
+                "influencer": ["influencer", "influencer_%"]
+            }
+            
+            result = []
+            
+            for user_type, patterns in user_types.items():
+                # Count roles for this user type
+                conditions = []
+                for pattern in patterns:
+                    if pattern.endswith('%'):
+                        conditions.append(Role.name.like(pattern))
+                    else:
+                        conditions.append(Role.name == pattern)
+                
+                if conditions:
+                    from sqlalchemy import or_
+                    count = db.query(Role).filter(or_(*conditions)).count()
+                else:
+                    count = 0
+                
+                result.append({
+                    "user_type": user_type,
+                    "role_count": count,
+                    "description": {
+                        "platform": "Platform-specific roles for system administration and management",
+                        "company": "Company-specific roles for business users and teams",
+                        "influencer": "Influencer-specific roles for content creators"
+                    }.get(user_type, f"{user_type.title()} roles")
+                })
+            
+            return {
+                "user_types": result,
+                "total_roles": db.query(Role).count()
+            }
+        except Exception as e:
+            logger.error(f"Error in get_user_types_with_role_counts controller: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error retrieving user types statistics"
+            )
     
     @staticmethod
     async def get_all_permissions(db: Session):
@@ -61,13 +210,33 @@ class RoleController:
                     detail="Role not found"
                 )
             
-            role_data = RoleDetailResponse.model_validate(role)
-            role_data.permissions = [
-                PermissionResponse.model_validate(rp.permission) 
-                for rp in role.permissions
-            ]
-            
-            return role_data
+            try:
+                # Create role data first
+                role_data = RoleDetailResponse.model_validate(role)
+                
+                # Handle permissions properly
+                permissions = []
+                if hasattr(role, 'permissions') and role.permissions:
+                    for role_permission in role.permissions:
+                        if hasattr(role_permission, 'permission') and role_permission.permission:
+                            perm_response = PermissionResponse.model_validate(role_permission.permission)
+                            permissions.append(perm_response)
+                
+                role_data.permissions = permissions
+                return role_data
+                
+            except Exception as validation_error:
+                logger.error(f"Error validating role {role.name}: {str(validation_error)}")
+                # Create a minimal role response if validation fails
+                return RoleDetailResponse(
+                    id=str(role.id),
+                    name=role.name,
+                    description=role.description or "",
+                    permissions=[]
+                )
+                
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error in get_role_by_id controller: {str(e)}")
             raise

@@ -46,7 +46,7 @@ class SocialAccountBrief(BaseModel):
     following_count: Optional[int] = None
     subscribers_count: Optional[int] = None
     likes_count: Optional[int] = None
-    
+    additional_metrics: Optional[Dict[str, Any]] = None
     model_config = {"from_attributes": True}
     
     @field_validator('id', 'platform_id', mode='before')
@@ -101,8 +101,11 @@ class CampaignListMemberBulkCreate(BaseModel):
 
 class CampaignListMemberUpdate(BaseModel):
     status_id: Optional[str] = None
+    platform_id: Optional[str] = None  # Add missing field
     contact_attempts: Optional[int] = None
+    last_contacted_at: Optional[datetime] = None  # Add missing field
     next_contact_at: Optional[datetime] = None
+    responded_at: Optional[datetime] = None  # Add missing field
     collaboration_price: Optional[float] = None
     ready_to_onboard: Optional[bool] = None  # New field
     notes: Optional[str] = None  # New field

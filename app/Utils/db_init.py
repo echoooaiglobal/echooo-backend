@@ -73,7 +73,8 @@ def initialize_default_roles_permissions(db: Session):
             company_permissions = db.query(Permission).filter(
                 (Permission.name.like("company:%")) | 
                 (Permission.name.like("campaign:%")) |
-                (Permission.name.like("influencer:read"))
+                (Permission.name.like("influencer:read")) |
+                (Permission.name.like("influencer_contacts:read"))
             ).all()
             
             for perm in company_permissions:
@@ -91,7 +92,8 @@ def initialize_default_roles_permissions(db: Session):
             company_read_permissions = db.query(Permission).filter(
                 (Permission.name == "company:read") | 
                 (Permission.name == "campaign:read") |
-                (Permission.name == "influencer:read")
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer_contacts:read")
             ).all()
             
             for perm in company_read_permissions:
@@ -108,7 +110,10 @@ def initialize_default_roles_permissions(db: Session):
         if influencer:
             influencer_permissions = db.query(Permission).filter(
                 (Permission.name == "influencer:read") | 
-                (Permission.name == "influencer:update")
+                (Permission.name == "influencer:update") |
+                (Permission.name == "influencer_contacts:read") |
+                (Permission.name == "influencer_contacts:create") |
+                (Permission.name == "influencer_contacts:update")
             ).all()
             
             for perm in influencer_permissions:
@@ -120,8 +125,6 @@ def initialize_default_roles_permissions(db: Session):
                 if not role_perm:
                     role_perm = RolePermission(role_id=influencer.id, permission_id=perm.id)
                     db.add(role_perm)
-
-        
 
         # Assign permissions to platform_manager
         platform_manager = db.query(Role).filter(Role.name == "platform_manager").first()
@@ -194,7 +197,9 @@ def initialize_default_roles_permissions(db: Session):
         if platform_moderator:
             moderator_permissions = db.query(Permission).filter(
                 (Permission.name.like("%:read")) |
-                (Permission.name == "influencer:update")
+                (Permission.name == "influencer:update") |
+                (Permission.name == "influencer_contacts:read") |
+                (Permission.name == "influencer_contacts:update")
             ).all()
             
             for perm in moderator_permissions:
@@ -207,12 +212,17 @@ def initialize_default_roles_permissions(db: Session):
                     role_perm = RolePermission(role_id=platform_moderator.id, permission_id=perm.id)
                     db.add(role_perm)
 
-        # Assign permissions to platform_agent
+        # Assign permissions to platform_agent - INCLUDING NEW INFLUENCER_CONTACTS PERMISSIONS
         platform_agent = db.query(Role).filter(Role.name == "platform_agent").first()
         if platform_agent:
             agent_permissions = db.query(Permission).filter(
                 (Permission.name.like("campaign:%")) |
-                (Permission.name.like("influencer:read"))
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer:update") |
+                # NEW: Add influencer_contacts permissions for platform_agent
+                (Permission.name == "influencer_contacts:read") |
+                (Permission.name == "influencer_contacts:create") |
+                (Permission.name == "influencer_contacts:update")
             ).all()
             
             for perm in agent_permissions:
@@ -231,7 +241,8 @@ def initialize_default_roles_permissions(db: Session):
             company_manager_permissions = db.query(Permission).filter(
                 (Permission.name.like("company:%")) |
                 (Permission.name.like("campaign:%")) |
-                (Permission.name.like("influencer:read"))
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer_contacts:read")
             ).all()
             
             for perm in company_manager_permissions:
@@ -249,7 +260,8 @@ def initialize_default_roles_permissions(db: Session):
         if company_accountant:
             accountant_permissions = db.query(Permission).filter(
                 (Permission.name == "company:read") |
-                (Permission.name == "campaign:read")
+                (Permission.name == "campaign:read") |
+                (Permission.name == "influencer_contacts:read")
             ).all()
             
             for perm in accountant_permissions:
@@ -268,7 +280,8 @@ def initialize_default_roles_permissions(db: Session):
             marketer_permissions = db.query(Permission).filter(
                 (Permission.name == "company:read") |
                 (Permission.name.like("campaign:%")) |
-                (Permission.name.like("influencer:read"))
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer_contacts:read")
             ).all()
             
             for perm in marketer_permissions:
@@ -287,7 +300,8 @@ def initialize_default_roles_permissions(db: Session):
             creator_permissions = db.query(Permission).filter(
                 (Permission.name == "company:read") |
                 (Permission.name == "campaign:read") |
-                (Permission.name.like("influencer:read"))
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer_contacts:read")
             ).all()
             
             for perm in creator_permissions:
@@ -308,7 +322,6 @@ def initialize_default_roles_permissions(db: Session):
                 platform = Platform(**platform_data)
                 db.add(platform)
 
-
         # Initialize default categories from dictionary
         for category_data in DEFAULT_CATEGORIES:
             category = db.query(Category).filter(Category.name == category_data["name"]).first()
@@ -316,7 +329,7 @@ def initialize_default_roles_permissions(db: Session):
                 category = Category(**category_data)
                 db.add(category)
         
-         # Initialize statuses from dictionary
+        # Initialize statuses from dictionary
         for status_data in DEFAULT_STATUSES:
             status = db.query(Status).filter(
                 Status.model == status_data["model"],

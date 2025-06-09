@@ -65,7 +65,6 @@ class CampaignListBrief(BaseModel):
 class StatusBrief(BaseModel):
     id: str
     name: str
-    model: str
     
     model_config = {"from_attributes": True}
     

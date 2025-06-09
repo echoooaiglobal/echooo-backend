@@ -1,7 +1,7 @@
 # routes/api/v0/roles.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import uuid
 
 from app.Http.Controllers.RoleController import RoleController
@@ -17,11 +17,64 @@ router = APIRouter(prefix="/roles", tags=["Roles & Permissions"])
 
 @router.get("/", response_model=List[RoleDetailResponse])
 async def get_all_roles(
+    user_type: Optional[str] = Query(None, description="Filter roles by user type (platform, company, influencer)"),
     current_user: User = Depends(has_role(["platform_admin"])),
     db: Session = Depends(get_db)
 ):
-    """Get all roles with their permissions"""
+    """
+    Get all roles with their permissions, optionally filtered by user type
+    
+    Query Parameters:
+    - user_type: Filter roles by user type (platform, company, influencer)
+      - platform: Returns roles like platform_admin, platform_user, platform_manager, etc.
+      - company: Returns roles like company_admin, company_user, company_manager, etc.
+      - influencer: Returns roles like influencer, influencer_manager
+    """
+    if user_type:
+        # Validate user_type
+        valid_user_types = ["platform", "company", "influencer"]
+        if user_type.lower() not in valid_user_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid user_type. Must be one of: {', '.join(valid_user_types)}"
+            )
+        return await RoleController.get_roles_by_user_type(user_type.lower(), db)
+    
     return await RoleController.get_all_roles(db)
+
+@router.get("/by-type/{user_type}", response_model=List[RoleDetailResponse])
+async def get_roles_by_user_type(
+    user_type: str,
+    current_user: User = Depends(has_role(["platform_admin", "platform_manager", "platform_agent"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get roles specific to a user type
+    
+    Path Parameters:
+    - user_type: The user type (platform, company, influencer)
+    
+    Returns roles filtered by naming convention:
+    - platform: platform_admin, platform_user, platform_manager, etc.
+    - company: company_admin, company_user, company_manager, etc.
+    - influencer: influencer, influencer_manager
+    """
+    valid_user_types = ["platform", "company", "influencer"]
+    if user_type.lower() not in valid_user_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid user_type. Must be one of: {', '.join(valid_user_types)}"
+        )
+    
+    return await RoleController.get_roles_by_user_type(user_type.lower(), db)
+
+@router.get("/user-types/list")
+async def get_user_types(
+    current_user: User = Depends(has_role(["platform_admin", "platform_manager"])),
+    db: Session = Depends(get_db)
+):
+    """Get list of available user types and their role counts"""
+    return await RoleController.get_user_types_with_role_counts(db)
 
 @router.get("/permissions", response_model=List[PermissionResponse])
 async def get_all_permissions(

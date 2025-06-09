@@ -164,7 +164,10 @@ class AssignmentService:
         """
         try:
             # Check if the assignment belongs to any of the user's agents
-            assignment = db.query(ListAssignment).join(Agent).filter(
+            assignment = db.query(ListAssignment).join(
+                Agent, 
+                ListAssignment.agent_id == Agent.id
+            ).filter(
                 ListAssignment.id == assignment_id,
                 Agent.assigned_to_user_id == user_id
             ).first()
