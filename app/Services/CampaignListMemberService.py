@@ -194,69 +194,49 @@ class CampaignListMemberService:
                 except (ValueError, TypeError):
                     logger.warning(f"Unable to parse followers count: {followers_count_raw}")
             
-            # If social account exists, update it
+            # Prepare social account data mapping
+            social_account_data = {
+                "platform_id": platform_id,
+                "platform_account_id": platform_account_id,
+                "account_handle": social_data.get('username', ''),
+                "full_name": social_data.get('name', ''),
+                "profile_pic_url": social_data.get('profileImage', ''),
+                "is_verified": social_data.get('isVerified', False),
+                "account_url": social_data.get('account_url', ''),
+                "additional_metrics": social_data.get('additional_metrics', {})
+            }
+            
+            # Add followers count if successfully parsed
+            if followers_count is not None:
+                social_account_data["followers_count"] = followers_count
+            
+            # If social account exists, update it with new data
             if existing_account:
                 social_account_id = existing_account.id
-                account_updated = False
                 
-                # Update account handle
-                if existing_account.account_handle != social_data.get('username', '') and social_data.get('username'):
-                    existing_account.account_handle = social_data.get('username')
-                    account_updated = True
+                # Always update all fields (except platform_id and platform_account_id)
+                for field, new_value in social_account_data.items():
+                    # Skip platform_id and platform_account_id as they shouldn't change
+                    if field in ['platform_id', 'platform_account_id']:
+                        continue
+                    
+                    setattr(existing_account, field, new_value)
                 
-                # Update full name
-                if existing_account.full_name != social_data.get('name', '') and social_data.get('name'):
-                    existing_account.full_name = social_data.get('name')
-                    account_updated = True
-                
-                # Update profile image
-                if existing_account.profile_pic_url != social_data.get('profileImage', '') and social_data.get('profileImage'):
-                    existing_account.profile_pic_url = social_data.get('profileImage')
-                    account_updated = True
-                
-                # Update verified status
-                if existing_account.is_verified != social_data.get('isVerified', False) and social_data.get('isVerified') is not None:
-                    existing_account.is_verified = social_data.get('isVerified')
-                    account_updated = True
-                
-                # Update followers count
-                if followers_count is not None and existing_account.followers_count != followers_count:
-                    existing_account.followers_count = followers_count
-                    account_updated = True
-                
-                # If any data was updated, commit the changes
-                if account_updated:
-                    logger.info(f"Updating social account data for {existing_account.account_handle} (ID: {existing_account.id})")
-                    db.commit()
-                    db.refresh(existing_account)
+                logger.info(f"Updating social account data for {existing_account.account_handle} (ID: {existing_account.id})")
+                db.commit()
+                db.refresh(existing_account)
+                    
             else:
-                # If no social account exists, check if there's any existing influencer to associate with
-                # This is optional - you could look up by username or other criteria
-                # For now, we'll just create the social account without an influencer association
+                # Create new social account
+                social_account_data["influencer_id"] = None  # This field needs to be nullable in the database
                 
-                # Build social account data
-                social_account_data = {
-                    # Leave influencer_id as NULL for now
-                    "influencer_id": None,  # This field needs to be nullable in the database
-                    "platform_id": platform_id,
-                    "platform_account_id": platform_account_id,
-                    "account_handle": social_data.get('username', ''),
-                    "full_name": social_data.get('name', ''),
-                    "profile_pic_url": social_data.get('profileImage', ''),
-                    "is_verified": social_data.get('isVerified', False)
-                }
-                
-                # Add followers count if available
-                if followers_count is not None:
-                    social_account_data["followers_count"] = followers_count
-                
-                # Create social account
                 new_social_account = SocialAccount(**social_account_data)
                 db.add(new_social_account)
                 db.commit()
                 db.refresh(new_social_account)
                 
                 social_account_id = new_social_account.id
+                logger.info(f"Created new social account: {new_social_account.account_handle} (ID: {new_social_account.id})")
             
             # Check if member already exists in this list
             existing_member = db.query(CampaignListMember).filter(
@@ -266,6 +246,12 @@ class CampaignListMemberService:
             
             if existing_member:
                 logger.info(f"Social account is already a member of this list: list_id={list_id}, social_account_id={social_account_id}")
+                # Load relationships for proper response
+                existing_member = db.query(CampaignListMember).options(
+                    joinedload(CampaignListMember.social_account),
+                    joinedload(CampaignListMember.status),
+                    joinedload(CampaignListMember.platform)
+                ).filter(CampaignListMember.id == existing_member.id).first()
                 return existing_member
             
             # Get default status
