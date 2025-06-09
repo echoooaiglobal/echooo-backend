@@ -46,6 +46,7 @@ class SocialAccountBrief(BaseModel):
     following_count: Optional[int] = None
     subscribers_count: Optional[int] = None
     likes_count: Optional[int] = None
+    account_url: Optional[str] = None
     additional_metrics: Optional[Dict[str, Any]] = None
     model_config = {"from_attributes": True}
     

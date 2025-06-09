@@ -277,12 +277,15 @@ class CampaignListMemberController:
                 "platform_account_id": member.social_account.platform_account_id,  # Include this field
                 "is_verified": member.social_account.is_verified,
                 "profile_pic_url": member.social_account.profile_pic_url,
+                "account_url": member.social_account.account_url,
+                "additional_metrics": member.social_account.additional_metrics,
                 "is_private": member.social_account.is_private,
                 "is_business": member.social_account.is_business,
                 "media_count": member.social_account.media_count,
                 "following_count": member.social_account.following_count,
                 "subscribers_count": member.social_account.subscribers_count,
                 "likes_count": member.social_account.likes_count,
+
             }
             
             response.social_account = SocialAccountBrief(**social_account_data)
