@@ -196,6 +196,7 @@ class AssignmentController:
                 "platform_account_id": member.social_account.platform_account_id,
                 "is_verified": member.social_account.is_verified,
                 "profile_pic_url": member.social_account.profile_pic_url,
+                "account_url": member.social_account.account_url,
                 "is_private": member.social_account.is_private,
                 "is_business": member.social_account.is_business,
                 "media_count": member.social_account.media_count,

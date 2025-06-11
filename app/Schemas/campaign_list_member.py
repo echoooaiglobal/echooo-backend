@@ -21,7 +21,7 @@ class StatusBrief(BaseModel):
 class PlatformBrief(BaseModel):
     id: str
     name: str
-    
+    logo_url: Optional[str] = None
     model_config = {"from_attributes": True}
     
     @field_validator('id', mode='before')
