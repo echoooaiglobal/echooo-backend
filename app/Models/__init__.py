@@ -26,6 +26,11 @@ from app.Models.campaign_list_members import (
     CampaignListMember
 )
 
+from app.Models.results import (
+    Result
+)
+
+
 # This makes it easier to import models elsewhere
 __all__ = [
     'Base',
@@ -36,5 +41,5 @@ __all__ = [
     'Platform', 'Category',
     'Status', 'MessageChannel', 'Agent', 'Campaign',
     'CampaignList', 'CampaignListMember', 'MessageTemplate',
-    'ListAssignment', 'InfluencerOutreach'
+    'ListAssignment', 'InfluencerOutreach', 'Result'
 ]
