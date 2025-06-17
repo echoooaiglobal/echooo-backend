@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # CORS settings
     BACKEND_CORS_ORIGINS: List[str] = os.getenv(
         "BACKEND_CORS_ORIGINS", 
-        "http://localhost,http://localhost:3000,http://localhost:3001,https://dashboard.echooo.ai,http://35.244.31.63:3000"
+        "http://localhost,http://localhost:3000,http://localhost:3001,https://dashboard.echooo.ai,http://35.244.31.63:3000,http://192.168.18.74:3000"
     ).split(",")
     
     # Database settings
