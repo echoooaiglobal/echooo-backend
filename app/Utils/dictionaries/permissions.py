@@ -25,5 +25,10 @@ DEFAULT_PERMISSIONS = [
     {"name": "influencer_contacts:create", "description": "Create influencer contacts"},
     {"name": "influencer_contacts:read", "description": "Read influencer contact details"},
     {"name": "influencer_contacts:update", "description": "Update influencer contact details"},
-    {"name": "influencer_contacts:delete", "description": "Delete influencer contacts"}
+    {"name": "influencer_contacts:delete", "description": "Delete influencer contacts"},
+    # NEW: Analytics permissions
+    {"name": "profile_analytics:create", "description": "Create profile analytics"},
+    {"name": "profile_analytics:read", "description": "Read profile analytics"},
+    {"name": "profile_analytics:update", "description": "Update profile analytics"},
+    {"name": "profile_analytics:delete", "description": "Delete profile analytics"}
 ]

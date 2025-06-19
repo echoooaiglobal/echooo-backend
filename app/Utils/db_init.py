@@ -37,6 +37,7 @@ def initialize_default_roles_permissions(db: Session):
         platform_admin = db.query(Role).filter(Role.name == "platform_admin").first()
         platform_user = db.query(Role).filter(Role.name == "platform_user").first()
         company_admin = db.query(Role).filter(Role.name == "company_admin").first()
+        campaign_manager = db.query(Role).filter(Role.name == "company_campaign_manager").first()
         company_user = db.query(Role).filter(Role.name == "company_user").first()
         influencer = db.query(Role).filter(Role.name == "influencer").first()
         
@@ -85,6 +86,24 @@ def initialize_default_roles_permissions(db: Session):
                 
                 if not role_perm:
                     role_perm = RolePermission(role_id=company_admin.id, permission_id=perm.id)
+                    db.add(role_perm)
+
+        # Assign campaign manager permissions to campaign_manager
+        if campaign_manager:
+            campaign_permissions = db.query(Permission).filter(
+                (Permission.name.like("campaign:%")) |
+                (Permission.name == "influencer:read") |
+                (Permission.name == "influencer_contacts:read")
+            ).all()
+            
+            for perm in campaign_permissions:
+                role_perm = db.query(RolePermission).filter(
+                    RolePermission.role_id == campaign_manager.id,
+                    RolePermission.permission_id == perm.id
+                ).first()
+                
+                if not role_perm:
+                    role_perm = RolePermission(role_id=campaign_manager.id, permission_id=perm.id)
                     db.add(role_perm)
         
         # Assign read permissions to company_user
