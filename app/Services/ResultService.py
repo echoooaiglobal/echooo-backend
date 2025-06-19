@@ -141,9 +141,13 @@ class ResultService:
             total = db.query(Result).filter(Result.campaign_id == campaign_id).count()
             
             # Get results with pagination - avoid loading campaign relationship to prevent datetime issues
+            # results = db.query(Result).filter(
+            #     Result.campaign_id == campaign_id
+            # ).order_by(desc(Result.created_at)).offset(offset).limit(per_page).all()
+
             results = db.query(Result).filter(
                 Result.campaign_id == campaign_id
-            ).order_by(desc(Result.created_at)).offset(offset).limit(per_page).all()
+            ).order_by(desc(Result.created_at)).offset(offset).all()
             
             return results, total
             

@@ -66,7 +66,7 @@ class RoleController:
                 "platform": ["platform_admin", "platform_user", "platform_manager", 
                            "platform_accountant", "platform_developer", "platform_customer_support", 
                            "platform_content_moderator", "platform_agent"],
-                "company": ["company_admin", "company_user", "company_manager", 
+                "company": ["company_admin", "company_user", "company_manager", "company_campaign_manager",
                           "company_accountant", "company_marketer", "company_content_creator"],
                 "influencer": ["influencer", "influencer_manager"]
             }

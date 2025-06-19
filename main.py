@@ -14,7 +14,7 @@ from app.Utils.db_init import initialize_default_roles_permissions
 from routes.api.v0 import (
     auth, campaign_list_members, instagram, influencers, platforms, companies,
     categories, campaigns, statuses, message_channels, agents, list_assignments, message_templates,
-    users, roles, permissions, assignments, influencer_contacts, results
+    users, roles, permissions, assignments, influencer_contacts, results, profile_analytics
 )
 
 # Create FastAPI application context manager
@@ -103,6 +103,7 @@ app.include_router(message_templates.router, prefix=settings.API_V0_STR)
 app.include_router(assignments.router, prefix=settings.API_V0_STR)
 app.include_router(influencer_contacts.router, prefix=settings.API_V0_STR)
 app.include_router(results.router, prefix=settings.API_V0_STR)
+app.include_router(profile_analytics.router, prefix=settings.API_V0_STR)
 
 
 

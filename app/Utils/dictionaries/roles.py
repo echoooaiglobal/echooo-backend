@@ -24,6 +24,7 @@ DEFAULT_ROLES = [
     {"name": "company_accountant", "description": "Handles company financial matters"},
     {"name": "company_marketer", "description": "Marketing specialist for company"},
     {"name": "company_content_creator", "description": "Content creation role for company"},
+    {"name": "company_campaign_manager", "description": "Campaign manager with full campaign and analytics access"},
 
     # influencer-specific roles
     {"name": "influencer", "description": "Influencer user"},

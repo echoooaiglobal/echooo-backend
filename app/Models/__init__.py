@@ -30,6 +30,8 @@ from app.Models.results import (
     Result
 )
 
+from app.Models.profile_analytics import ProfileAnalytics
+
 
 # This makes it easier to import models elsewhere
 __all__ = [
@@ -41,5 +43,5 @@ __all__ = [
     'Platform', 'Category',
     'Status', 'MessageChannel', 'Agent', 'Campaign',
     'CampaignList', 'CampaignListMember', 'MessageTemplate',
-    'ListAssignment', 'InfluencerOutreach', 'Result'
+    'ListAssignment', 'InfluencerOutreach', 'Result', 'ProfileAnalytics'
 ]

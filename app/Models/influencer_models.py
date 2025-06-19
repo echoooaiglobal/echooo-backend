@@ -57,7 +57,7 @@ class SocialAccount(Base):
     list_memberships = relationship("CampaignListMember", back_populates="social_account")
     contacts = relationship("InfluencerContact", back_populates="social_account")
     outreach_records = relationship("InfluencerOutreach", back_populates="social_account", overlaps="social_account")
-
+    profile_analytics = relationship("ProfileAnalytics", back_populates="social_account")
     
     # Unique constraint to prevent duplicate platform accounts per influencer
     __table_args__ = (
