@@ -53,7 +53,33 @@ class CampaignController:
         except Exception as e:
             logger.error(f"Error in get_campaign controller: {str(e)}")
             raise
-    
+
+    @staticmethod
+    async def get_company_deleted_campaigns(company_id: uuid.UUID, db: Session):
+        """Get all deleted campaigns for a specific company"""
+        try:
+            campaigns = await CampaignService.get_company_deleted_campaigns(company_id, db)
+            return [
+                CampaignController._format_campaign_response(campaign)
+                for campaign in campaigns
+            ]
+        except Exception as e:
+            logger.error(f"Error in get_company_deleted_campaigns controller: {str(e)}")
+            raise
+
+    @staticmethod
+    async def get_all_deleted_campaigns(db: Session):
+        """Get all deleted campaigns (for platform admins)"""
+        try:
+            campaigns = await CampaignService.get_all_deleted_campaigns(db)
+            return [
+                CampaignController._format_campaign_response(campaign)
+                for campaign in campaigns
+            ]
+        except Exception as e:
+            logger.error(f"Error in get_all_deleted_campaigns controller: {str(e)}")
+            raise
+
     @staticmethod
     async def create_campaign(
         campaign_data: CampaignCreate,
@@ -139,13 +165,33 @@ class CampaignController:
         return response
     
     @staticmethod
-    async def delete_campaign(campaign_id: uuid.UUID, db: Session):
-        """Delete a campaign"""
+    async def delete_campaign(campaign_id: uuid.UUID, current_user: User, db: Session):
+        """Soft delete a campaign"""
         try:
-            await CampaignService.delete_campaign(campaign_id, db)
+            await CampaignService.delete_campaign(campaign_id, current_user.id, db)  # Pass user ID for deleted_by
             return {"message": "Campaign deleted successfully"}
         except Exception as e:
             logger.error(f"Error in delete_campaign controller: {str(e)}")
+            raise
+
+    @staticmethod
+    async def restore_campaign(campaign_id: uuid.UUID, db: Session):
+        """Restore a soft deleted campaign"""
+        try:
+            campaign = await CampaignService.restore_campaign(campaign_id, db)
+            return CampaignController._format_campaign_response(campaign)
+        except Exception as e:
+            logger.error(f"Error in restore_campaign controller: {str(e)}")
+            raise
+
+    @staticmethod
+    async def hard_delete_campaign(campaign_id: uuid.UUID, db: Session):
+        """Permanently delete a campaign"""
+        try:
+            await CampaignService.hard_delete_campaign(campaign_id, db)
+            return {"message": "Campaign permanently deleted"}
+        except Exception as e:
+            logger.error(f"Error in hard_delete_campaign controller: {str(e)}")
             raise
 
     # Campaign List methods

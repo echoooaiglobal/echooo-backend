@@ -133,6 +133,7 @@ class CampaignUpdate(BaseModel):
     status_id: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    default_filters: Optional[bool] = None 
 
 class CategoryBrief(BaseModel):
     id: str
@@ -203,6 +204,10 @@ class ListAssignmentBrief(BaseModel):
 class CampaignResponse(CampaignBase):
     id: str  # UUID as string
     created_by: str  # FK -> users.id
+    default_filters: bool  # Include in response for frontend logic
+    is_deleted: bool = False  # Include soft delete status
+    deleted_at: Optional[datetime] = None
+    deleted_by: Optional[str] = None  # UUID as string
     created_at: datetime
     updated_at: datetime
     category: Optional[CategoryBrief] = None  # Include category info
@@ -212,7 +217,7 @@ class CampaignResponse(CampaignBase):
     list_assignments: List[ListAssignmentBrief] = []
     model_config = {"from_attributes": True}
     
-    @field_validator('id', 'company_id', 'created_by', 'category_id', 'status_id', mode='before')
+    @field_validator('id', 'company_id', 'created_by', 'category_id', 'status_id', 'deleted_by', mode='before')
     @classmethod
     def convert_uuid_to_str(cls, v):
         if isinstance(v, uuid.UUID):
@@ -248,37 +253,6 @@ class CampaignListResponse(CampaignListBase):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
-
-# # Message Template schemas
-# class MessageTemplateBase(BaseModel):
-#     subject: str
-#     content: str
-#     company_id: str
-#     campaign_id: str
-#     is_global: bool = True
-
-# class MessageTemplateCreate(MessageTemplateBase):
-#     pass
-
-# class MessageTemplateUpdate(BaseModel):
-#     subject: Optional[str] = None
-#     content: Optional[str] = None
-#     is_global: Optional[bool] = None
-
-# class MessageTemplateResponse(MessageTemplateBase):
-#     id: str
-#     created_by: str
-#     created_at: datetime
-#     updated_at: datetime
-    
-#     model_config = {"from_attributes": True}
-    
-#     @field_validator('id', 'company_id', 'campaign_id', 'created_by', mode='before')
-#     @classmethod
-#     def convert_uuid_to_str(cls, v):
-#         if isinstance(v, uuid.UUID):
-#             return str(v)
-#         return v
 
 # ListAssignment schemas
 class ListAssignmentBase(BaseModel):

@@ -57,30 +57,40 @@ class Campaign(Base):
     __tablename__ = 'campaigns'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    company_id = Column(UUID(as_uuid=True), ForeignKey('companies.id', ondelete='CASCADE'), nullable=False)  # FK -> companies.id
-    name = Column(String(150), nullable=False)  # Campaign name
+    company_id = Column(UUID(as_uuid=True), ForeignKey('companies.id', ondelete='CASCADE'), nullable=False)
+    name = Column(String(150), nullable=False)
 
-    brand_name = Column(String(150), nullable=True)  # Brand name
-    category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)  # FK -> categories.id
-    audience_age_group = Column(String(50), nullable=True)  # Target audience age group
-    budget = Column(Numeric(10, 2), nullable=True)  # Campaign budget
-    currency_code = Column(String(3), nullable=True)  # Currency code (e.g., USD, EUR)
+    brand_name = Column(String(150), nullable=True)
+    category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
+    audience_age_group = Column(String(50), nullable=True)
+    budget = Column(Numeric(10, 2), nullable=True)
+    currency_code = Column(String(3), nullable=True)
     
     # Status field
-    status_id = Column(UUID(as_uuid=True), ForeignKey('statuses.id', ondelete='SET NULL'), nullable=True)  # FK -> statuses.id
+    status_id = Column(UUID(as_uuid=True), ForeignKey('statuses.id', ondelete='SET NULL'), nullable=True)
     
-    description = Column(Text, nullable=True)  # Campaign details
-    start_date = Column(DateTime, nullable=True)  # Campaign start date
-    end_date = Column(DateTime, nullable=True)  # Campaign end date
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='SET NULL'), nullable=False)  # FK -> users.id (platform_admin)
+    description = Column(Text, nullable=True)
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='SET NULL'), nullable=False)
+    
+    # Field to control default filters application
+    default_filters = Column(Boolean, nullable=False, default=True)
+    
+    # Soft delete fields
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    company = relationship("Company", back_populates="campaigns")  # This should match the Company.campaigns relationship
+    company = relationship("Company", back_populates="campaigns")
     creator = relationship("User", foreign_keys=[created_by])
-    category = relationship("Category", foreign_keys=[category_id])  # New relationship for category
-    status = relationship("Status", foreign_keys=[status_id])  # New relationship for status
+    deleter = relationship("User", foreign_keys=[deleted_by])  # New relationship for who deleted
+    category = relationship("Category", foreign_keys=[category_id])
+    status = relationship("Status", foreign_keys=[status_id])
     campaign_lists = relationship("CampaignList", back_populates="campaign", cascade="all, delete-orphan")
     message_templates = relationship("MessageTemplate", back_populates="campaign", cascade="all, delete-orphan")
 

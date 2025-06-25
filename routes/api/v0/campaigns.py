@@ -11,6 +11,8 @@ from app.Schemas.campaign import (
     CampaignListCreate, CampaignListUpdate, CampaignListResponse
 )
 
+from app.Services.CampaignService import CampaignService
+
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission
 )
@@ -70,8 +72,43 @@ async def delete_campaign(
     current_user: User = Depends(has_permission("campaign:delete")),
     db: Session = Depends(get_db)
 ):
-    """Delete a campaign"""
-    return await CampaignController.delete_campaign(campaign_id, db)
+    """Soft delete a campaign"""
+    return await CampaignController.delete_campaign(campaign_id, current_user, db)
+
+@router.patch("/{campaign_id}/restore", response_model=CampaignResponse)
+async def restore_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(has_permission("campaign:delete")),  # Same permission as delete
+    db: Session = Depends(get_db)
+):
+    """Restore a soft deleted campaign"""
+    return await CampaignController.restore_campaign(campaign_id, db)
+
+@router.delete("/{campaign_id}/permanent")
+async def hard_delete_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(has_role(["company_admin"])),
+    db: Session = Depends(get_db)
+):
+    """Permanently delete a campaign (irreversible)"""
+    return await CampaignController.hard_delete_campaign(campaign_id, db)
+
+@router.get("/company/{company_id}/deleted", response_model=List[CampaignResponse])
+async def get_company_deleted_campaigns(
+    company_id: uuid.UUID,
+    current_user: User = Depends(has_permission("campaign:read")),
+    db: Session = Depends(get_db)
+):
+    """Get all soft deleted campaigns for a specific company"""
+    return await CampaignController.get_company_deleted_campaigns(company_id, db)
+
+@router.get("/deleted", response_model=List[CampaignResponse])
+async def get_all_deleted_campaigns(
+    current_user: User = Depends(has_permission("campaign:read")),
+    db: Session = Depends(get_db)
+):
+    """Get all soft deleted campaigns (for platform admins)"""
+    return await CampaignController.get_all_deleted_campaigns(db)
 
 # Influencer List endpoints
 @router.get("/{campaign_id}/lists", response_model=List[CampaignListResponse])

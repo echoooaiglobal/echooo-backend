@@ -10,7 +10,7 @@ from app.Schemas.profile_analytics import (
     ProfileAnalyticsCreate, ProfileAnalyticsUpdate, ProfileAnalyticsResponse,
     ProfileAnalyticsListResponse, ProfileAnalyticsStatsResponse,
     ProfileAnalyticsWithSocialAccountCreate, ProfileAnalyticsWithSocialAccountResponse,
-    SocialAccountWithAnalyticsResponse
+    SocialAccountWithAnalyticsResponse, AnalyticsExistsResponse
 )
 from app.Utils.Helpers import get_current_active_user
 from config.database import get_db
@@ -61,11 +61,47 @@ async def create_analytics_with_social_account(
     """
     return await ProfileAnalyticsController.create_analytics_with_social_account(data, db)
 
+@router.get("/exists/{platform_account_id}", response_model=AnalyticsExistsResponse)
+async def check_analytics_existence(
+    platform_account_id: str,
+    platform_id: Optional[str] = Query(None, description="Optional platform ID to filter results"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check if analytics exist for a platform account
+    
+    This endpoint checks whether analytics data exists for a given platform account ID.
+    It returns detailed information about the existence status, analytics count, and 
+    the date of the latest analytics record.
+    
+    Path Parameters:
+    - platform_account_id: The platform-specific account ID to check
+    
+    Query Parameters:
+    - platform_id: Optional platform ID to filter results (recommended for accuracy)
+    
+    Response:
+    - exists: Boolean indicating if analytics exist
+    - platform_account_id: The account ID that was checked
+    - platform_id: Platform ID if provided
+    - social_account_id: Social account ID if found
+    - analytics_count: Number of analytics records found
+    - latest_analytics_date: Date of the most recent analytics record
+    
+    Examples:
+    - `/profile-analytics/exists/instagram_123456`
+    - `/profile-analytics/exists/instagram_123456?platform_id=uuid-here`
+    """
+    return await ProfileAnalyticsController.check_analytics_exists(
+        platform_account_id, platform_id, db
+    )
+
 @router.get("/by-handle/{handle_or_account_id}", response_model=SocialAccountWithAnalyticsResponse)
 async def get_analytics_by_handle_or_account_id(
     handle_or_account_id: str,
     platform_id: Optional[str] = Query(None, description="Optional platform ID to filter results"),
-    current_user: User = Depends(get_current_active_user),
+    # current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
