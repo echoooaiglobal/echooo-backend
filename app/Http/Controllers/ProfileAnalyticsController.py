@@ -13,11 +13,66 @@ from app.Schemas.profile_analytics import (
     ProfileAnalyticsCreate, ProfileAnalyticsUpdate, ProfileAnalyticsResponse,
     ProfileAnalyticsListResponse, ProfileAnalyticsStatsResponse,
     ProfileAnalyticsBrief, ProfileAnalyticsWithSocialAccountCreate,
-    ProfileAnalyticsWithSocialAccountResponse, SocialAccountWithAnalyticsResponse
+    ProfileAnalyticsWithSocialAccountResponse, SocialAccountWithAnalyticsResponse,
+    SocialAccountForAnalyticsResponse, AnalyticsExistsResponse
 )
 from app.Schemas.influencer import SocialAccountResponse
 
 class ProfileAnalyticsController:
+    
+    @staticmethod
+    async def check_analytics_exists(
+        platform_account_id: str,
+        platform_id: Optional[str] = None,
+        db: Session = None
+    ) -> AnalyticsExistsResponse:
+        """Check if analytics exist for a platform account"""
+        try:
+            # Build query to find social account
+            query = db.query(SocialAccount).filter(
+                SocialAccount.platform_account_id == platform_account_id
+            )
+            
+            # Add platform filter if provided
+            if platform_id:
+                query = query.filter(SocialAccount.platform_id == platform_id)
+            
+            social_account = query.first()
+            
+            if not social_account:
+                return AnalyticsExistsResponse(
+                    exists=False,
+                    platform_account_id=platform_account_id,
+                    platform_id=platform_id,
+                    social_account_id=None,
+                    analytics_count=0,
+                    latest_analytics_date=None
+                )
+            
+            # Check for analytics records
+            analytics_query = db.query(ProfileAnalytics).filter(
+                ProfileAnalytics.social_account_id == social_account.id
+            )
+            
+            analytics_count = analytics_query.count()
+            latest_analytics = analytics_query.order_by(
+                desc(ProfileAnalytics.created_at)
+            ).first()
+            
+            return AnalyticsExistsResponse(
+                exists=analytics_count > 0,
+                platform_account_id=platform_account_id,
+                platform_id=platform_id,
+                social_account_id=str(social_account.id),
+                analytics_count=analytics_count,
+                latest_analytics_date=latest_analytics.created_at if latest_analytics else None
+            )
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error checking analytics existence: {str(e)}"
+            )
     
     @staticmethod
     async def create_analytics_with_social_account(
@@ -26,13 +81,16 @@ class ProfileAnalyticsController:
     ) -> ProfileAnalyticsWithSocialAccountResponse:
         """Create or update social account and create analytics record"""
         try:
-            # Validate platform exists
-            platform = db.query(Platform).filter(Platform.id == data.social_account_data.platform_id).first()
+            # Validate platform exists using work_platform_id
+            platform = db.query(Platform).filter(Platform.work_platform_id == data.social_account_data.platform_id).first()
             if not platform:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Platform not found"
                 )
+            
+            # Replace the work_platform_id with the actual platform.id
+            data.social_account_data.platform_id = str(platform.id)
             
             # Validate category if provided
             if data.social_account_data.category_id:
@@ -46,7 +104,7 @@ class ProfileAnalyticsController:
             # Check if social account exists (by platform_id and platform_account_id)
             existing_social_account = db.query(SocialAccount).filter(
                 and_(
-                    SocialAccount.platform_id == data.social_account_data.platform_id,
+                    SocialAccount.platform_id == platform.id,
                     SocialAccount.platform_account_id == data.social_account_data.platform_account_id
                 )
             ).first()
@@ -91,13 +149,19 @@ class ProfileAnalyticsController:
                 joinedload(SocialAccount.influencer)
             ).filter(SocialAccount.id == social_account.id).first()
             
-            analytics_record = db.query(ProfileAnalytics).options(
-                joinedload(ProfileAnalytics.social_account)
-            ).filter(ProfileAnalytics.id == analytics_record.id).first()
+            # Create analytics response without relationship issues
+            analytics_dict = {
+                "id": str(analytics_record.id),
+                "social_account_id": str(analytics_record.social_account_id),
+                "analytics": analytics_record.analytics,
+                "created_at": analytics_record.created_at,
+                "updated_at": analytics_record.updated_at,
+                "social_account": None  # Set to None to avoid validation issues
+            }
             
             return ProfileAnalyticsWithSocialAccountResponse(
-                social_account=SocialAccountResponse.model_validate(social_account).model_dump(),
-                analytics=ProfileAnalyticsResponse.model_validate(analytics_record),
+                social_account=SocialAccountForAnalyticsResponse.model_validate(social_account).model_dump(),
+                analytics_data=ProfileAnalyticsResponse.model_validate(analytics_dict),
                 message=message
             )
             
@@ -144,16 +208,27 @@ class ProfileAnalyticsController:
                 )
             
             # Get all analytics for this social account
-            analytics_records = db.query(ProfileAnalytics).options(
-                joinedload(ProfileAnalytics.social_account)
-            ).filter(
+            analytics_records = db.query(ProfileAnalytics).filter(
                 ProfileAnalytics.social_account_id == social_account.id
             ).order_by(desc(ProfileAnalytics.created_at)).all()
             
+            # Convert analytics to response format
+            analytics_responses = []
+            for analytics in analytics_records:
+                analytics_dict = {
+                    "id": str(analytics.id),
+                    "social_account_id": str(analytics.social_account_id),
+                    "analytics": analytics.analytics,
+                    "created_at": analytics.created_at,
+                    "updated_at": analytics.updated_at,
+                    "social_account": None  # Set to None to avoid validation issues
+                }
+                analytics_responses.append(ProfileAnalyticsResponse.model_validate(analytics_dict))
+            
             return SocialAccountWithAnalyticsResponse(
-                social_account=SocialAccountResponse.model_validate(social_account).model_dump(),
-                analytics=[ProfileAnalyticsResponse.model_validate(analytics) for analytics in analytics_records],
-                analytics_count=len(analytics_records)
+                social_account=SocialAccountForAnalyticsResponse.model_validate(social_account).model_dump(),
+                analytics_data=analytics_responses,
+                analytics_count=len(analytics_responses)
             )
             
         except HTTPException:
@@ -188,12 +263,17 @@ class ProfileAnalyticsController:
             db.commit()
             db.refresh(db_analytics)
             
-            # Load relationships
-            db_analytics = db.query(ProfileAnalytics).options(
-                joinedload(ProfileAnalytics.social_account)
-            ).filter(ProfileAnalytics.id == db_analytics.id).first()
+            # Convert to response format without relationship issues
+            analytics_dict = {
+                "id": str(db_analytics.id),
+                "social_account_id": str(db_analytics.social_account_id),
+                "analytics": db_analytics.analytics,
+                "created_at": db_analytics.created_at,
+                "updated_at": db_analytics.updated_at,
+                "social_account": None  # Set to None to avoid validation issues
+            }
             
-            return ProfileAnalyticsResponse.model_validate(db_analytics)
+            return ProfileAnalyticsResponse.model_validate(analytics_dict)
             
         except HTTPException:
             raise
@@ -207,9 +287,7 @@ class ProfileAnalyticsController:
     @staticmethod
     async def get_analytics_by_id(analytics_id: uuid.UUID, db: Session) -> ProfileAnalyticsResponse:
         """Get profile analytics by ID"""
-        analytics = db.query(ProfileAnalytics).options(
-            joinedload(ProfileAnalytics.social_account)
-        ).filter(ProfileAnalytics.id == analytics_id).first()
+        analytics = db.query(ProfileAnalytics).filter(ProfileAnalytics.id == analytics_id).first()
         
         if not analytics:
             raise HTTPException(
@@ -217,7 +295,17 @@ class ProfileAnalyticsController:
                 detail="Profile analytics not found"
             )
         
-        return ProfileAnalyticsResponse.model_validate(analytics)
+        # Convert to response format without relationship issues
+        analytics_dict = {
+            "id": str(analytics.id),
+            "social_account_id": str(analytics.social_account_id),
+            "analytics": analytics.analytics,
+            "created_at": analytics.created_at,
+            "updated_at": analytics.updated_at,
+            "social_account": None  # Set to None to avoid validation issues
+        }
+        
+        return ProfileAnalyticsResponse.model_validate(analytics_dict)
     
     @staticmethod
     async def get_analytics_by_social_account(
@@ -225,13 +313,24 @@ class ProfileAnalyticsController:
         db: Session
     ) -> List[ProfileAnalyticsResponse]:
         """Get all analytics for a social account"""
-        analytics_list = db.query(ProfileAnalytics).options(
-            joinedload(ProfileAnalytics.social_account)
-        ).filter(
+        analytics_list = db.query(ProfileAnalytics).filter(
             ProfileAnalytics.social_account_id == social_account_id
         ).order_by(desc(ProfileAnalytics.created_at)).all()
         
-        return [ProfileAnalyticsResponse.model_validate(analytics) for analytics in analytics_list]
+        # Convert to response format without loading relationships
+        result = []
+        for analytics in analytics_list:
+            analytics_dict = {
+                "id": str(analytics.id),
+                "social_account_id": str(analytics.social_account_id),
+                "analytics": analytics.analytics,
+                "created_at": analytics.created_at,
+                "updated_at": analytics.updated_at,
+                "social_account": None  # Set to None to avoid validation issues
+            }
+            result.append(ProfileAnalyticsResponse.model_validate(analytics_dict))
+        
+        return result
     
     @staticmethod
     async def get_all_analytics(
@@ -256,11 +355,24 @@ class ProfileAnalyticsController:
         offset = (page - 1) * per_page
         analytics_list = query.order_by(desc(ProfileAnalytics.created_at)).offset(offset).limit(per_page).all()
         
+        # Convert to response format without relationship issues
+        analytics_responses = []
+        for analytics in analytics_list:
+            analytics_dict = {
+                "id": str(analytics.id),
+                "social_account_id": str(analytics.social_account_id),
+                "analytics": analytics.analytics,
+                "created_at": analytics.created_at,
+                "updated_at": analytics.updated_at,
+                "social_account": None  # Set to None to avoid validation issues
+            }
+            analytics_responses.append(ProfileAnalyticsResponse.model_validate(analytics_dict))
+        
         # Calculate total pages
         total_pages = math.ceil(total / per_page)
         
         return ProfileAnalyticsListResponse(
-            analytics=[ProfileAnalyticsResponse.model_validate(analytics) for analytics in analytics_list],
+            analytics=analytics_responses,
             total=total,
             page=page,
             per_page=per_page,
@@ -294,11 +406,19 @@ class ProfileAnalyticsController:
             db.refresh(analytics)
             
             # Load relationships
-            analytics = db.query(ProfileAnalytics).options(
-                joinedload(ProfileAnalytics.social_account)
-            ).filter(ProfileAnalytics.id == analytics_id).first()
+            analytics = db.query(ProfileAnalytics).filter(ProfileAnalytics.id == analytics_id).first()
             
-            return ProfileAnalyticsResponse.model_validate(analytics)
+            # Convert to response format without relationship issues
+            analytics_dict = {
+                "id": str(analytics.id),
+                "social_account_id": str(analytics.social_account_id),
+                "analytics": analytics.analytics,
+                "created_at": analytics.created_at,
+                "updated_at": analytics.updated_at,
+                "social_account": None  # Set to None to avoid validation issues
+            }
+            
+            return ProfileAnalyticsResponse.model_validate(analytics_dict)
             
         except HTTPException:
             raise

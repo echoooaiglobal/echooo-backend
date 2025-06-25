@@ -1,6 +1,7 @@
 # app/Services/CampaignService.py
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 from app.Models.campaign_models import Campaign, CampaignList, Status, ListAssignment
@@ -13,54 +14,146 @@ class CampaignService:
     """Service for managing campaigns"""
 
     @staticmethod
-    async def get_all_campaigns(db: Session):
+    async def get_all_campaigns(db: Session, include_deleted: bool = False):
         """
         Get all campaigns with all related data including list assignments
+        By default excludes soft deleted campaigns
         """
-        return db.query(Campaign).options(
+        query = db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            # Add nested loading for list assignments through campaign lists
             joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
-        ).all()
+        )
+        
+        if not include_deleted:
+            query = query.filter(Campaign.is_deleted == False)
+            
+        return query.all()
 
     @staticmethod
-    async def get_company_campaigns(company_id: uuid.UUID, db: Session):
+    async def get_company_campaigns(company_id: uuid.UUID, db: Session, include_deleted: bool = False):
         """
         Get all campaigns for a specific company with all related data
+        By default excludes soft deleted campaigns
         """
-        return db.query(Campaign).options(
+        query = db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            # Add nested loading for list assignments
             joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
-        ).filter(Campaign.company_id == company_id).all()
+        ).filter(Campaign.company_id == company_id)
+        
+        if not include_deleted:
+            query = query.filter(Campaign.is_deleted == False)
+            
+        return query.all()
 
     @staticmethod
-    async def get_campaign_by_id(campaign_id: uuid.UUID, db: Session):
+    async def get_campaign_by_id(campaign_id: uuid.UUID, db: Session, include_deleted: bool = False):
         """
         Get a campaign by ID with all related data
+        Automatically update default_filters to False if it's True (first access logic)
+        Returns the campaign with original default_filters value for frontend to use
         """
-        campaign = db.query(Campaign).options(
+        query = db.query(Campaign).options(
             joinedload(Campaign.category),
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            # Add nested loading for list assignments
             joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
-        ).filter(Campaign.id == campaign_id).first()
+        ).filter(Campaign.id == campaign_id)
+        
+        if not include_deleted:
+            query = query.filter(Campaign.is_deleted == False)
+            
+        campaign = query.first()
         
         if not campaign:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Campaign not found"
             )
+        
+        # Store the original value to return to frontend
+        original_default_filters = campaign.default_filters
+        
+        # Smart default_filters logic: if it's True, update it to False for next time
+        if campaign.default_filters:
+            campaign.default_filters = False
+            db.commit()
+            logger.info(f"Campaign {campaign_id} default_filters updated to False after first access")
+            
+            # Refresh to get updated data, but preserve the original default_filters for response
+            db.refresh(campaign)
+            # Set it back to original value for the response
+            campaign.default_filters = original_default_filters
             
         return campaign
+
+    @staticmethod
+    async def get_company_deleted_campaigns(company_id: uuid.UUID, db: Session):
+        """
+        Get all soft deleted campaigns for a specific company
+        
+        Args:
+            company_id: ID of the company
+            db: Database session
+            
+        Returns:
+            List[Campaign]: List of deleted campaigns for the company
+        """
+        try:
+            campaigns = db.query(Campaign).options(
+                joinedload(Campaign.category),
+                joinedload(Campaign.status),
+                joinedload(Campaign.campaign_lists),
+                joinedload(Campaign.message_templates),
+                joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+            ).filter(
+                Campaign.company_id == company_id,
+                Campaign.is_deleted == True  # Only deleted campaigns
+            ).all()
+            
+            return campaigns
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while getting deleted campaigns for company {company_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get deleted campaigns"
+            )
+
+    @staticmethod
+    async def get_all_deleted_campaigns(db: Session):
+        """
+        Get all soft deleted campaigns (for platform admins)
+        
+        Args:
+            db: Database session
+            
+        Returns:
+            List[Campaign]: List of all deleted campaigns
+        """
+        try:
+            campaigns = db.query(Campaign).options(
+                joinedload(Campaign.category),
+                joinedload(Campaign.status),
+                joinedload(Campaign.campaign_lists),
+                joinedload(Campaign.message_templates),
+                joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+            ).filter(Campaign.is_deleted == True).all()
+            
+            return campaigns
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while getting all deleted campaigns: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get deleted campaigns"
+            )
     
     @staticmethod
     async def create_campaign(campaign_data: Dict[str, Any], created_by: uuid.UUID, db: Session):
@@ -337,9 +430,93 @@ class CampaignService:
             ) from e
     
     @staticmethod
-    async def delete_campaign(campaign_id: uuid.UUID, db: Session):
+    async def soft_delete_campaign(campaign_id: uuid.UUID, deleted_by: uuid.UUID, db: Session):
         """
-        Delete a campaign
+        Soft delete a campaign (mark as deleted instead of removing from database)
+        
+        Args:
+            campaign_id: ID of the campaign
+            deleted_by: ID of the user performing the deletion
+            db: Database session
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            campaign = db.query(Campaign).filter(
+                Campaign.id == campaign_id,
+                Campaign.is_deleted == False  # Only allow deleting non-deleted campaigns
+            ).first()
+            
+            if not campaign:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Campaign not found or already deleted"
+                )
+            
+            # Mark as deleted
+            campaign.is_deleted = True
+            campaign.deleted_at = func.now()
+            campaign.deleted_by = deleted_by
+            
+            db.commit()
+            logger.info(f"Campaign {campaign_id} soft deleted by user {deleted_by}")
+            
+            return True
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Error soft deleting campaign: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error deleting campaign"
+            ) from e
+
+    @staticmethod
+    async def restore_campaign(campaign_id: uuid.UUID, db: Session):
+        """
+        Restore a soft deleted campaign
+        
+        Args:
+            campaign_id: ID of the campaign
+            db: Database session
+            
+        Returns:
+            Campaign: The restored campaign
+        """
+        try:
+            campaign = db.query(Campaign).filter(
+                Campaign.id == campaign_id,
+                Campaign.is_deleted == True  # Only allow restoring deleted campaigns
+            ).first()
+            
+            if not campaign:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Deleted campaign not found"
+                )
+            
+            # Restore the campaign
+            campaign.is_deleted = False
+            campaign.deleted_at = None
+            campaign.deleted_by = None
+            
+            db.commit()
+            db.refresh(campaign)
+            logger.info(f"Campaign {campaign_id} restored")
+            
+            return campaign
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Error restoring campaign: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error restoring campaign"
+            ) from e
+
+    @staticmethod
+    async def hard_delete_campaign(campaign_id: uuid.UUID, db: Session):
+        """
+        Permanently delete a campaign from database
         
         Args:
             campaign_id: ID of the campaign
@@ -359,12 +536,21 @@ class CampaignService:
             
             db.delete(campaign)
             db.commit()
+            logger.info(f"Campaign {campaign_id} permanently deleted")
             
             return True
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error(f"Error deleting campaign: {str(e)}")
+            logger.error(f"Error permanently deleting campaign: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error deleting campaign"
             ) from e
+
+    # Alias for backward compatibility - this will now perform soft delete
+    @staticmethod
+    async def delete_campaign(campaign_id: uuid.UUID, deleted_by: uuid.UUID, db: Session):
+        """
+        Delete a campaign (soft delete by default)
+        """
+        return await CampaignService.soft_delete_campaign(campaign_id, deleted_by, db)
