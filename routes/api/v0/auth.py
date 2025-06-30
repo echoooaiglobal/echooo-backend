@@ -1,4 +1,4 @@
-# routes/api/v0/auth.py
+# routes/api/v0/auth.py - FIXED with complete-company-registration endpoint
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -90,7 +90,6 @@ async def update_profile(
     """Update current user's profile"""
     return await AuthController.update_profile(user_data, current_user, db)
 
-
 @router.post("/verify-email", response_model=EmailVerificationResponse)
 async def verify_email(
     token_data: EmailVerificationToken,
@@ -124,6 +123,16 @@ async def get_verification_status(
         )
     
     return await AuthController.get_verification_status(user_id, db)
+
+# FIX: Add the complete-company-registration endpoint
+@router.post("/complete-company-registration")
+async def complete_company_registration(
+    company_data: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Complete company registration for OAuth users"""
+    return await AuthController.complete_company_registration(company_data, current_user, db)
 
 # Development/Testing endpoints
 @router.post("/manual-verify")

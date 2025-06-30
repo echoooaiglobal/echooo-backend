@@ -579,3 +579,144 @@ class AuthController:
             )
         
         return await EmailVerificationService.get_verification_status(user_uuid, db)
+    
+    @staticmethod
+    async def complete_company_registration(
+        company_data: dict,
+        current_user: User = Depends(get_current_active_user),
+        db: Session = Depends(get_db)
+    ):
+        """Complete company registration for OAuth users"""
+        try:
+            # FIX: Instead of checking if user is already a company user,
+            # check if they already have a complete company setup
+            
+            # Validate company data
+            company_name = company_data.get('company_name', '').strip()
+            company_domain = company_data.get('company_domain', '').strip()
+            
+            if not company_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Company name is required"
+                )
+            
+            if not company_domain:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Company domain is required"
+                )
+            
+            # Check if user already has a fully configured company
+            existing_company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
+            
+            if existing_company_user:
+                existing_company = db.query(Company).filter(Company.id == existing_company_user.company_id).first()
+                
+                # If company exists and has both name and domain set, and they're not placeholder values
+                if (existing_company and 
+                    existing_company.name and 
+                    existing_company.domain and
+                    not existing_company.name.endswith("'s Company") and  # Not a placeholder
+                    existing_company.domain != company_domain):  # Allow updating if domain is different
+                    
+                    # FIX: Allow updating existing company instead of rejecting
+                    logger.info(f"Updating existing company {existing_company.id} for user {current_user.id}")
+                    
+                    # Update the existing company
+                    existing_company.name = company_name
+                    existing_company.domain = company_domain
+                    existing_company.updated_at = datetime.utcnow()
+                    
+                    db.commit()
+                    db.refresh(existing_company)
+                    
+                    # Update user type if not already set
+                    if current_user.user_type != "company":
+                        current_user.user_type = "company"
+                        db.commit()
+                        db.refresh(current_user)
+                    
+                    return {
+                        "message": "Company information updated successfully",
+                        "user": UserResponse.model_validate(current_user),
+                        "company": CompanyBriefResponse.model_validate(existing_company)
+                    }
+                
+                elif existing_company:
+                    # Update placeholder company with real data
+                    logger.info(f"Updating placeholder company {existing_company.id} for user {current_user.id}")
+                    
+                    existing_company.name = company_name
+                    existing_company.domain = company_domain
+                    existing_company.updated_at = datetime.utcnow()
+                    
+                    db.commit()
+                    db.refresh(existing_company)
+                    
+                    # Update user type if not already set
+                    if current_user.user_type != "company":
+                        current_user.user_type = "company"
+                        db.commit()
+                        db.refresh(current_user)
+                    
+                    return {
+                        "message": "Company registration completed successfully",
+                        "user": UserResponse.model_validate(current_user),
+                        "company": CompanyBriefResponse.model_validate(existing_company)
+                    }
+            
+            # No existing company association, create new company and association
+            logger.info(f"Creating new company for user {current_user.id}")
+            
+            # Set user type to company if not already set
+            if current_user.user_type != "company":
+                current_user.user_type = "company"
+            
+            # Ensure user has company_admin role
+            company_admin_role = db.query(Role).filter(Role.name == "company_admin").first()
+            
+            if not company_admin_role:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Company admin role not found"
+                )
+            
+            # Add company_admin role if not already present
+            if company_admin_role not in current_user.roles:
+                # Clear existing roles and add company_admin role
+                current_user.roles.clear()
+                current_user.roles.append(company_admin_role)
+            
+            # Create company using CompanyService
+            from app.Services.CompanyService import CompanyService
+            
+            company = await CompanyService.create_company(
+                {
+                    "name": company_name,
+                    "domain": company_domain
+                },
+                current_user.id,
+                db
+            )
+            
+            db.commit()
+            db.refresh(current_user)
+            
+            logger.info(f"Successfully completed company registration for user {current_user.id}")
+            
+            return {
+                "message": "Company registration completed successfully",
+                "user": UserResponse.model_validate(current_user),
+                "company": CompanyBriefResponse.model_validate(company)
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error completing company registration: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error completing company registration: {str(e)}"
+            )

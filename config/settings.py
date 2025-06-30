@@ -77,6 +77,25 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
     RATE_LIMIT_PERIOD_SECONDS: int = int(os.getenv("RATE_LIMIT_PERIOD_SECONDS", "3600"))
+
+
+    # OAuth Provider Settings
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str =os.getenv("GOOGLE_CLIENT_SECRET", "")
+    FACEBOOK_APP_ID: str = os.getenv("FACEBOOK_APP_ID", "")
+    FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
+    INSTAGRAM_APP_ID: str = os.getenv("INSTAGRAM_APP_ID", "")
+    INSTAGRAM_APP_SECRET: str = os.getenv("INSTAGRAM_APP_SECRET", "")
+    LINKEDIN_CLIENT_ID: str = os.getenv("LINKEDIN_CLIENT_ID", "")
+    LINKEDIN_CLIENT_SECRET: str = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+ 
+    # OAuth URLs
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:3000/oauth/callback")
+    
+    # Token encryption key for storing OAuth tokens securely
+    # Generate using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    TOKEN_ENCRYPTION_KEY: str = ""
     
     # For Pydantic v2
     if PYDANTIC_V2:
