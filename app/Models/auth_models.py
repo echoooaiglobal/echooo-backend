@@ -32,7 +32,7 @@ class User(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
     full_name = Column(String(255), nullable=False)
     phone_number = Column(String(20), nullable=True)
     profile_image_url = Column(String(255), nullable=True)
@@ -50,6 +50,12 @@ class User(Base):
     # Relationships to other domains - using back_populates to establish bidirectional relationships
     influencer = relationship("Influencer", back_populates="user", uselist=False)
     company_associations = relationship("CompanyUser", back_populates="user", cascade="all, delete-orphan")
+
+    # OAuth accounts for login/signup via social media
+    oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
+    
+    # Agent social connections for platform agents to manage Instagram business accounts
+    agent_social_connections = relationship("AgentSocialConnection", back_populates="user", cascade="all, delete-orphan")
 
 class Role(Base):
     __tablename__ = 'roles'

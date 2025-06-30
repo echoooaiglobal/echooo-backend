@@ -16,6 +16,7 @@ from routes.api.v0 import (
     categories, campaigns, statuses, message_channels, agents, list_assignments, message_templates,
     users, roles, permissions, assignments, influencer_contacts, results, profile_analytics
 )
+from routes.api.v0 import oauth, agent_instagram
 
 # Create FastAPI application context manager
 @asynccontextmanager
@@ -105,6 +106,8 @@ app.include_router(influencer_contacts.router, prefix=settings.API_V0_STR)
 app.include_router(results.router, prefix=settings.API_V0_STR)
 app.include_router(profile_analytics.router, prefix=settings.API_V0_STR)
 
+app.include_router(oauth.router, prefix=settings.API_V0_STR)
+app.include_router(agent_instagram.router, prefix=settings.API_V0_STR)
 
 
 # Health check endpoint
