@@ -52,6 +52,11 @@ class Settings(BaseSettings):
         "BACKEND_CORS_ORIGINS", 
         "http://localhost,http://localhost:3000,http://localhost:3001,https://dashboard.echooo.ai,http://35.244.31.63:3000,http://192.168.18.74:3000"
     ).split(",")
+
+    # Shopify webhook settings
+    SHOPIFY_WEBHOOK_SECRET: Optional[str] = os.getenv("SHOPIFY_WEBHOOK_SECRET")
+    DISABLE_WEBHOOK_SIGNATURE_VERIFICATION: bool = os.getenv("DISABLE_WEBHOOK_SIGNATURE_VERIFICATION", "True").lower() == "true"
+
     
     # Database settings
     DB_TYPE: str = os.getenv("DB_TYPE", "postgresql")
