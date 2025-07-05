@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # CORS settings
     BACKEND_CORS_ORIGINS: List[str] = os.getenv(
         "BACKEND_CORS_ORIGINS", 
-        "http://localhost,http://localhost:3000,http://localhost:3001,https://dashboard.echooo.ai,http://35.244.31.63:3000,http://192.168.18.74:3000"
+        "http://localhost,http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,https://dashboard.echooo.ai,http://35.244.31.63:3000,http://192.168.18.74:3000"
     ).split(",")
 
     # Shopify webhook settings
@@ -61,10 +61,10 @@ class Settings(BaseSettings):
     # Database settings
     DB_TYPE: str = os.getenv("DB_TYPE", "postgresql")
     DB_USERNAME: str = os.getenv("DB_USERNAME", "postgres")
-    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "echooo123")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "echooo")
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: str = os.getenv("DB_PORT", "5432")
-    DB_NAME: str = os.getenv("DB_NAME", "echooo_development_002")
+    DB_NAME: str = os.getenv("DB_NAME", "echooo_development_001")
     
     # Email settings
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() == "true"

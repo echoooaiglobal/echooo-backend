@@ -13,7 +13,7 @@ from app.Schemas.order import OrderCreate, OrderUpdate, ShopifyWebhookOrder, Ord
 from app.Utils.Logger import logger
 
 class OrderService:
-    """Service for managing orders and order items"""
+    """Service for managing orders and order items with collection-based discounts"""
 
     @staticmethod
     def _normalize_properties(properties: Any) -> Optional[Dict[str, Any]]:
@@ -48,6 +48,144 @@ class OrderService:
             return None
 
     @staticmethod
+    def _extract_collections_from_line_item(line_item: Dict[str, Any]) -> Tuple[List[Dict], List[str]]:
+        """
+        Extract collection information from line item
+        
+        Args:
+            line_item: Shopify line item data
+            
+        Returns:
+            Tuple[List[Dict], List[str]]: Collections data and handles
+        """
+        collections = []
+        collection_handles = []
+        
+        # Check if collections data exists in the line item
+        if 'collections' in line_item:
+            collections_data = line_item['collections']
+            if isinstance(collections_data, list):
+                for collection in collections_data:
+                    if isinstance(collection, dict):
+                        collections.append(collection)
+                        if 'handle' in collection:
+                            collection_handles.append(collection['handle'])
+            elif isinstance(collections_data, dict):
+                collections.append(collections_data)
+                if 'handle' in collections_data:
+                    collection_handles.append(collections_data['handle'])
+        
+        # Fallback: Check if collection info is in product data
+        if not collections and 'product' in line_item:
+            product_data = line_item['product']
+            if isinstance(product_data, dict) and 'collections' in product_data:
+                collections_data = product_data['collections']
+                if isinstance(collections_data, list):
+                    for collection in collections_data:
+                        if isinstance(collection, dict):
+                            collections.append(collection)
+                            if 'handle' in collection:
+                                collection_handles.append(collection['handle'])
+        
+        return collections, collection_handles
+
+    @staticmethod
+    def _calculate_item_discount(
+        line_item: Dict[str, Any], 
+        discount_applications: List[Dict[str, Any]], 
+        collections: List[Dict[str, Any]]
+    ) -> Tuple[Optional[str], Optional[Decimal], Optional[Decimal], Optional[str]]:
+        """
+        Calculate discount for a specific item based on its collections
+        
+        Args:
+            line_item: Shopify line item data
+            discount_applications: All discount applications for the order
+            collections: Collections this item belongs to
+            
+        Returns:
+            Tuple[code, rate, amount, type]: Discount details for this item
+        """
+        if not discount_applications or not collections:
+            return None, None, None, None
+        
+        collection_handles = [col.get('handle') for col in collections if col.get('handle')]
+        item_price = Decimal(str(line_item.get('price', '0')))
+        item_quantity = line_item.get('quantity', 1)
+        line_total = item_price * item_quantity
+        
+        best_discount_code = None
+        best_discount_rate = Decimal('0')
+        best_discount_amount = Decimal('0')
+        best_discount_type = None
+        
+        for discount_app in discount_applications:
+            # Check if this discount applies to this item's collections
+            target_type = discount_app.get('target_type', '')
+            target_selection = discount_app.get('target_selection', '')
+            
+            # For collection-based discounts
+            if target_type == 'line_item' and target_selection == 'entitled':
+                # Check if any of the item's collections match the discount
+                discount_collections = discount_app.get('entitled_collection_ids', [])
+                if any(col_id in discount_collections for col_id in collection_handles):
+                    discount_rate, discount_amount, discount_type = OrderService._parse_discount_value(
+                        discount_app, line_total
+                    )
+                    
+                    if discount_rate > best_discount_rate:
+                        best_discount_code = discount_app.get('title') or discount_app.get('code')
+                        best_discount_rate = discount_rate
+                        best_discount_amount = discount_amount
+                        best_discount_type = discount_type
+            
+            # For order-level discounts (apply to all items)
+            elif target_type == 'line_item' and target_selection == 'all':
+                discount_rate, discount_amount, discount_type = OrderService._parse_discount_value(
+                    discount_app, line_total
+                )
+                
+                if discount_rate > best_discount_rate:
+                    best_discount_code = discount_app.get('title') or discount_app.get('code')
+                    best_discount_rate = discount_rate
+                    best_discount_amount = discount_amount
+                    best_discount_type = discount_type
+        
+        return best_discount_code, best_discount_rate, best_discount_amount, best_discount_type
+
+    @staticmethod
+    def _parse_discount_value(discount_app: Dict[str, Any], line_total: Decimal) -> Tuple[Decimal, Decimal, str]:
+        """
+        Parse discount value from discount application
+        
+        Args:
+            discount_app: Discount application data
+            line_total: Line item total price
+            
+        Returns:
+            Tuple[rate, amount, type]: Discount rate (%), amount, and type
+        """
+        value = discount_app.get('value', '0')
+        value_type = discount_app.get('value_type', 'percentage')
+        
+        try:
+            discount_value = Decimal(str(value))
+        except (ValueError, TypeError):
+            return Decimal('0'), Decimal('0'), value_type
+        
+        if value_type == 'percentage':
+            discount_rate = discount_value
+            discount_amount = (line_total * discount_value) / Decimal('100')
+        elif value_type == 'fixed_amount':
+            discount_rate = (discount_value / line_total * Decimal('100')) if line_total > 0 else Decimal('0')
+            discount_amount = discount_value
+        else:
+            discount_rate = Decimal('0')
+            discount_amount = Decimal('0')
+        
+        return discount_rate, discount_amount, value_type
+
+    @staticmethod
     def _extract_primary_discount_code(webhook_data: ShopifyWebhookOrder) -> Optional[str]:
         """
         Extract the primary discount code from webhook data
@@ -78,10 +216,33 @@ class OrderService:
         return None
 
     @staticmethod
+    def _extract_order_collections(line_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Extract all unique collections from order line items
+        
+        Args:
+            line_items: List of line items
+            
+        Returns:
+            List[Dict[str, Any]]: Unique collections in this order
+        """
+        all_collections = {}
+        
+        for line_item in line_items:
+            collections, _ = OrderService._extract_collections_from_line_item(line_item)
+            for collection in collections:
+                collection_id = collection.get('id') or collection.get('handle')
+                if collection_id:
+                    all_collections[collection_id] = collection
+        
+        return list(all_collections.values())
+
+    # Webhook-based Operations
+    @staticmethod
     async def create_order_from_shopify_webhook(webhook_data: ShopifyWebhookOrder, db: Session) -> Order:
         """
         Create an order from Shopify webhook data
-        Only creates orders that have a discount code applied
+        with collection-based discount calculation
         
         Args:
             webhook_data: Shopify webhook order data
@@ -119,6 +280,9 @@ class OrderService:
             if webhook_data.shipping_lines:
                 for shipping_line in webhook_data.shipping_lines:
                     shipping_price += Decimal(str(shipping_line.get('price', '0')))
+
+            # FIXED: Extract order-level collections BEFORE creating order_data
+            order_collections = OrderService._extract_order_collections(webhook_data.line_items)
             
             # Create order data
             order_data = {
@@ -138,9 +302,10 @@ class OrderService:
                 'total_discounts': Decimal(str(webhook_data.total_discounts)),
                 'shipping_price': shipping_price,
                 'currency': webhook_data.currency,
-                'used_discount_code': primary_discount_code,  # Store primary discount code
+                'used_discount_code': primary_discount_code,
                 'discount_codes': webhook_data.discount_codes,
                 'discount_applications': webhook_data.discount_applications,
+                'collections': order_collections,
                 'shipping_address': webhook_data.shipping_address,
                 'billing_address': webhook_data.billing_address,
                 'shopify_created_at': datetime.fromisoformat(webhook_data.created_at.replace('Z', '+00:00')),
@@ -156,8 +321,16 @@ class OrderService:
             db.add(order)
             db.flush()  # Get the order ID
             
-            # Create order items
+            # Create order items with collection-based discounts
             for line_item in webhook_data.line_items:
+                # Extract collections for this item
+                item_collections, collection_handles = OrderService._extract_collections_from_line_item(line_item)
+
+                # Calculate item-specific discount
+                discount_code, discount_rate, discount_amount, discount_type = OrderService._calculate_item_discount(
+                    line_item, webhook_data.discount_applications or [], item_collections
+                )
+
                 order_item_data = {
                     'order_id': order.id,
                     'shopify_line_item_id': str(line_item.get('id')),
@@ -168,9 +341,15 @@ class OrderService:
                     'vendor': line_item.get('vendor'),
                     'product_type': line_item.get('product_type'),
                     'sku': line_item.get('sku'),
+                    'collections': item_collections,
+                    'collection_handles': collection_handles,
                     'quantity': line_item.get('quantity', 1),
                     'price': Decimal(str(line_item.get('price', '0'))),
-                    'total_discount': Decimal(str(line_item.get('total_discount', '0'))),
+                    'total_discount': discount_amount or Decimal(str(line_item.get('total_discount', '0'))),
+                    'applied_discount_code': discount_code,
+                    'discount_rate': discount_rate,
+                    'discount_amount': discount_amount,
+                    'discount_type': discount_type,
                     'properties': OrderService._normalize_properties(line_item.get('properties')),
                     'fulfillment_status': line_item.get('fulfillment_status'),
                     'fulfillable_quantity': line_item.get('fulfillable_quantity'),
@@ -182,7 +361,7 @@ class OrderService:
             db.commit()
             db.refresh(order)
             
-            logger.info(f"Successfully created order {order.order_number} from Shopify webhook with discount code: {primary_discount_code}")
+            logger.info(f"Successfully created order {order.order_number} with collection-based discounts")
             return order
             
         except IntegrityError as e:
@@ -203,7 +382,7 @@ class OrderService:
     @staticmethod
     async def update_order_from_webhook(order: Order, webhook_data: ShopifyWebhookOrder, db: Session) -> Order:
         """
-        Update existing order from Shopify webhook data
+        Update existing order from Shopify webhook data with collection updates
         
         Args:
             order: Existing order to update
@@ -230,10 +409,39 @@ class OrderService:
             order.tags = webhook_data.tags
             order.note = webhook_data.note
             
+            # Update collections
+            order.collections = OrderService._extract_order_collections(webhook_data.line_items)
+
             # Update primary discount code if available
             if primary_discount_code:
                 order.used_discount_code = primary_discount_code
             
+            # Update order items with new discount calculations
+            for line_item in webhook_data.line_items:
+                shopify_line_item_id = str(line_item.get('id'))
+                existing_item = next(
+                    (item for item in order.order_items if item.shopify_line_item_id == shopify_line_item_id),
+                    None
+                )
+
+                if existing_item:
+                    # Extract collections for this item
+                    item_collections, collection_handles = OrderService._extract_collections_from_line_item(line_item)
+                    
+                    # Calculate updated discount
+                    discount_code, discount_rate, discount_amount, discount_type = OrderService._calculate_item_discount(
+                        line_item, webhook_data.discount_applications or [], item_collections
+                    )
+                    
+                    # Update item with new discount information
+                    existing_item.collections = item_collections
+                    existing_item.collection_handles = collection_handles
+                    existing_item.applied_discount_code = discount_code
+                    existing_item.discount_rate = discount_rate
+                    existing_item.discount_amount = discount_amount
+                    existing_item.discount_type = discount_type
+                    existing_item.total_discount = discount_amount or Decimal(str(line_item.get('total_discount', '0')))
+
             db.commit()
             db.refresh(order)
             
@@ -248,6 +456,307 @@ class OrderService:
                 detail="Failed to update order from webhook"
             )
 
+    @staticmethod
+    async def mark_order_as_fulfilled(shopify_order_id: str, fulfillment_status: str, db: Session) -> Optional[Order]:
+        """
+        Mark an order as fulfilled from webhook
+        
+        Args:
+            shopify_order_id: Shopify order ID
+            fulfillment_status: Fulfillment status
+            db: Database session
+            
+        Returns:
+            Optional[Order]: Updated order if found
+        """
+        try:
+            order = db.query(Order).filter(Order.shopify_order_id == shopify_order_id).first()
+            
+            if not order:
+                logger.warning(f"Order with Shopify ID {shopify_order_id} not found for fulfillment")
+                return None
+            
+            # Update fulfillment status
+            order.fulfillment_status = fulfillment_status
+            order.updated_at = datetime.utcnow()
+            
+            # Update order items fulfillment status
+            for item in order.order_items:
+                item.fulfillment_status = fulfillment_status
+                item.updated_at = datetime.utcnow()
+            
+            db.commit()
+            db.refresh(order)
+            
+            logger.info(f"Successfully updated order {order.order_number} with collection-based discounts")
+            return order
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error marking order as fulfilled: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to mark order as fulfilled"
+            )
+
+    @staticmethod
+    async def mark_order_as_cancelled(shopify_order_id: str, cancelled_at: str, cancel_reason: str, db: Session) -> Optional[Order]:
+        """
+        Mark an order as cancelled from webhook
+        
+        Args:
+            shopify_order_id: Shopify order ID
+            cancelled_at: Cancellation timestamp
+            cancel_reason: Reason for cancellation
+            db: Database session
+            
+        Returns:
+            Optional[Order]: Updated order if found
+        """
+        try:
+            order = db.query(Order).filter(Order.shopify_order_id == shopify_order_id).first()
+            
+            if not order:
+                logger.warning(f"Order with Shopify ID {shopify_order_id} not found for cancellation")
+                return None
+            
+            # Update order status to cancelled
+            order.order_status = 'cancelled'
+            order.updated_at = datetime.utcnow()
+            
+            # Add cancellation info to notes
+            cancellation_note = f"Order cancelled at {cancelled_at}"
+            if cancel_reason:
+                cancellation_note += f" - Reason: {cancel_reason}"
+            
+            if order.note:
+                order.note += f"\n{cancellation_note}"
+            else:
+                order.note = cancellation_note
+            
+            db.commit()
+            db.refresh(order)
+            
+            logger.info(f"Order {shopify_order_id} marked as cancelled")
+            return order
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error marking order as cancelled: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to mark order as cancelled"
+            )
+
+    @staticmethod
+    async def delete_order_by_shopify_id(shopify_order_id: str, db: Session) -> bool:
+        """
+        Delete an order by Shopify ID from webhook
+        
+        Args:
+            shopify_order_id: Shopify order ID
+            db: Database session
+            
+        Returns:
+            bool: True if deleted, False if not found
+        """
+        try:
+            order = db.query(Order).filter(Order.shopify_order_id == shopify_order_id).first()
+            
+            if not order:
+                logger.warning(f"Order with Shopify ID {shopify_order_id} not found for deletion")
+                return False
+            
+            # Delete the order (cascade will delete order items)
+            db.delete(order)
+            db.commit()
+            
+            logger.info(f"Order {shopify_order_id} deleted successfully")
+            return True
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting order by Shopify ID: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete order"
+            )
+
+    # Manual CRUD Operations
+    @staticmethod
+    async def create_order_manually(order_data: OrderCreate, db: Session) -> Order:
+        """
+        Manually create an order (not from webhook)
+        
+        Args:
+            order_data: Order creation data
+            db: Database session
+            
+        Returns:
+            Order: Created order instance
+        """
+        try:
+            # Create the order
+            order = Order(
+                shopify_order_id=order_data.shopify_order_id,
+                order_number=order_data.order_number,
+                order_status_url=order_data.order_status_url,
+                customer_email=order_data.customer_email,
+                customer_phone=order_data.customer_phone,
+                customer_first_name=order_data.customer_first_name,
+                customer_last_name=order_data.customer_last_name,
+                financial_status=order_data.financial_status,
+                fulfillment_status=order_data.fulfillment_status,
+                order_status=order_data.order_status or 'open',
+                total_price=order_data.total_price,
+                subtotal_price=order_data.subtotal_price,
+                total_tax=order_data.total_tax,
+                total_discounts=order_data.total_discounts,
+                shipping_price=order_data.shipping_price,
+                currency=order_data.currency,
+                used_discount_code=order_data.used_discount_code,
+                discount_codes=order_data.discount_codes,
+                discount_applications=order_data.discount_applications,
+                shipping_address=order_data.shipping_address,
+                billing_address=order_data.billing_address,
+                shopify_created_at=order_data.shopify_created_at,
+                shopify_updated_at=order_data.shopify_updated_at,
+                processed_at=order_data.processed_at,
+                tags=order_data.tags,
+                note=order_data.note,
+                source_name=order_data.source_name
+            )
+            
+            db.add(order)
+            db.flush()  # Get the order ID
+            
+            # Create order items
+            for item_data in order_data.order_items:
+                order_item = OrderItem(
+                    order_id=order.id,
+                    shopify_line_item_id=item_data.shopify_line_item_id,
+                    shopify_product_id=item_data.shopify_product_id,
+                    shopify_variant_id=item_data.shopify_variant_id,
+                    product_title=item_data.product_title,
+                    variant_title=item_data.variant_title,
+                    vendor=item_data.vendor,
+                    product_type=item_data.product_type,
+                    sku=item_data.sku,
+                    quantity=item_data.quantity,
+                    price=item_data.price,
+                    total_discount=item_data.total_discount,
+                    properties=OrderService._normalize_properties(item_data.properties),
+                    fulfillment_status=item_data.fulfillment_status,
+                    fulfillable_quantity=item_data.fulfillable_quantity
+                )
+                db.add(order_item)
+            
+            db.commit()
+            db.refresh(order)
+            
+            logger.info(f"Successfully created order {order.order_number} manually")
+            return order
+            
+        except IntegrityError as e:
+            db.rollback()
+            logger.error(f"Integrity error creating order manually: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Order with this Shopify ID already exists"
+            )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating order manually: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create order"
+            )
+
+    @staticmethod
+    async def update_order_manually(order_id: uuid.UUID, order_data: OrderUpdate, db: Session) -> Order:
+        """
+        Manually update an order
+        
+        Args:
+            order_id: Order UUID
+            order_data: Order update data
+            db: Database session
+            
+        Returns:
+            Order: Updated order instance
+        """
+        try:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            
+            if not order:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Order not found"
+                )
+            
+            # Update fields that are provided
+            update_data = order_data.model_dump(exclude_unset=True)
+            for field, value in update_data.items():
+                if hasattr(order, field):
+                    setattr(order, field, value)
+            
+            order.updated_at = datetime.utcnow()
+            
+            db.commit()
+            db.refresh(order)
+            
+            logger.info(f"Successfully updated order {order.order_number} manually")
+            return order
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating order manually: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update order"
+            )
+
+    @staticmethod
+    async def delete_order_manually(order_id: uuid.UUID, db: Session) -> bool:
+        """
+        Manually delete an order
+        
+        Args:
+            order_id: Order UUID
+            db: Database session
+            
+        Returns:
+            bool: True if deleted
+        """
+        try:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            
+            if not order:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Order not found"
+                )
+            
+            # Delete the order (cascade will delete order items)
+            db.delete(order)
+            db.commit()
+            
+            logger.info(f"Successfully deleted order {order.order_number} manually")
+            return True
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting order manually: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete order"
+            )
+
+    # Existing read operations (keeping all your current functionality)
     @staticmethod
     async def get_all_orders(
         db: Session,
@@ -369,7 +878,7 @@ class OrderService:
         per_page: int = 20
     ) -> Tuple[List[Order], int]:
         """
-        Get orders that used a specific discount code
+        Get orders that used a specific discount code - UPDATED with joinedload
         
         Args:
             db: Database session
@@ -384,13 +893,14 @@ class OrderService:
             # Calculate offset
             offset = (page - 1) * per_page
             
-            # Query orders by the used_discount_code field
-            query = db.query(Order).filter(Order.used_discount_code == discount_code)
+            # Query with joinedload to fetch order_items and their collections
+            query = db.query(Order).options(joinedload(Order.order_items))\
+                .filter(Order.used_discount_code.ilike(f"%{discount_code}%"))
             
             # Get total count
-            total = query.count()
+            total = db.query(Order).filter(Order.used_discount_code.ilike(f"%{discount_code}%")).count()
             
-            # Get results with pagination
+            # Get results with pagination and order_items loaded
             orders = query.order_by(Order.created_at.desc()).offset(offset).limit(per_page).all()
             
             return orders, total

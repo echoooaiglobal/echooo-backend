@@ -28,15 +28,22 @@ class DiscountApplicationSchema(BaseModel):
     """Schema for discount application details"""
     type: Optional[str] = None
     value: Optional[str] = None
-    value_type: Optional[str] = None
+    value_type: Optional[str] = None  # percentage, fixed_amount
     allocation_method: Optional[str] = None
     target_selection: Optional[str] = None
     target_type: Optional[str] = None
     description: Optional[str] = None
     title: Optional[str] = None
+    code: Optional[str] = None  # NEW: Discount code from application
+
+class CollectionSchema(BaseModel):
+    """Schema for product collections"""
+    id: Optional[str] = None
+    handle: Optional[str] = None
+    title: Optional[str] = None
 
 class OrderItemBase(BaseModel):
-    """Base schema for order items"""
+    """Base schema for order items - UPDATED"""
     shopify_line_item_id: Optional[str] = None
     shopify_product_id: Optional[str] = None
     shopify_variant_id: Optional[str] = None
@@ -45,10 +52,22 @@ class OrderItemBase(BaseModel):
     vendor: Optional[str] = None
     product_type: Optional[str] = None
     sku: Optional[str] = None
+    
+    # NEW: Collections information
+    collections: Optional[List[Dict[str, Any]]] = None
+    collection_handles: Optional[List[str]] = None
+    
     quantity: int = 1
     price: Decimal
     total_discount: Optional[Decimal] = 0
-    properties: Optional[Any] = None  # Can be dict, list, or any JSON structure
+    
+    # NEW: Per-item discount information
+    applied_discount_code: Optional[str] = None
+    discount_rate: Optional[Decimal] = None
+    discount_amount: Optional[Decimal] = None
+    discount_type: Optional[str] = None
+    
+    properties: Optional[Any] = None
     fulfillment_status: Optional[str] = None
     fulfillable_quantity: Optional[int] = None
 
@@ -73,7 +92,7 @@ class OrderItemResponse(OrderItemBase):
         return v
 
 class OrderBase(BaseModel):
-    """Base schema for orders"""
+    """Base schema for orders - UPDATED"""
     shopify_order_id: str
     order_number: str
     order_status_url: Optional[str] = None
@@ -90,9 +109,13 @@ class OrderBase(BaseModel):
     total_discounts: Optional[Decimal] = None
     shipping_price: Optional[Decimal] = None
     currency: str = 'USD'
-    used_discount_code: str = Field(..., description="Primary discount code used for this order")  # REQUIRED
+    used_discount_code: str = Field(..., description="Primary discount code used for this order")
     discount_codes: Optional[List[Dict[str, Any]]] = None
     discount_applications: Optional[List[Dict[str, Any]]] = None
+    
+    # NEW: Collections information
+    collections: Optional[List[Dict[str, Any]]] = None
+    
     shipping_address: Optional[Dict[str, Any]] = None
     billing_address: Optional[Dict[str, Any]] = None
     shopify_created_at: Optional[datetime] = None
@@ -119,6 +142,7 @@ class OrderUpdate(BaseModel):
     used_discount_code: Optional[str] = None
     discount_codes: Optional[List[Dict[str, Any]]] = None
     discount_applications: Optional[List[Dict[str, Any]]] = None
+    collections: Optional[List[Dict[str, Any]]] = None
     shopify_updated_at: Optional[datetime] = None
     processed_at: Optional[datetime] = None
     tags: Optional[str] = None
@@ -149,7 +173,7 @@ class OrderListResponse(BaseModel):
     total_pages: int
 
 class ShopifyWebhookOrder(BaseModel):
-    """Schema for Shopify webhook order payload"""
+    """Schema for Shopify webhook order payload - UPDATED"""
     id: int
     order_number: int
     order_status_url: Optional[str] = None

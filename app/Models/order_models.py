@@ -28,6 +28,10 @@ class Order(Base):
     fulfillment_status = Column(String(50), nullable=True)  # fulfilled, partial, pending, etc.
     order_status = Column(String(50), nullable=True)  # open, closed, cancelled
     
+    # Cancellation details
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    cancel_reason = Column(String(255), nullable=True)
+    
     # Pricing information
     total_price = Column(Numeric(10, 2), nullable=True)
     subtotal_price = Column(Numeric(10, 2), nullable=True)
@@ -36,14 +40,17 @@ class Order(Base):
     shipping_price = Column(Numeric(10, 2), nullable=True)
     currency = Column(String(10), nullable=False, default='USD')
     
-    # Discount information
-    used_discount_code = Column(String(100), nullable=False, index=True)  # Primary discount code used (REQUIRED)
-    discount_codes = Column(JSON, nullable=True)  # Store array of discount codes with details (for reference)
+    # Discount information - UPDATED
+    used_discount_code = Column(String(100), nullable=False, index=True)  # Primary discount code used
+    discount_codes = Column(JSON, nullable=True)  # Store array of discount codes with details
     discount_applications = Column(JSON, nullable=True)  # Store discount application details
     
+    # NEW: Collections information for the entire order
+    collections = Column(JSON, nullable=True)  # Store collections involved in this order
+    
     # Shipping information
-    shipping_address = Column(JSON, nullable=True)  # Store complete shipping address
-    billing_address = Column(JSON, nullable=True)   # Store complete billing address
+    shipping_address = Column(JSON, nullable=True)
+    billing_address = Column(JSON, nullable=True)
     
     # Order timestamps
     shopify_created_at = Column(DateTime(timezone=True), nullable=True)
@@ -55,9 +62,9 @@ class Order(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Additional order metadata
-    tags = Column(String(500), nullable=True)  # Shopify tags
-    note = Column(Text, nullable=True)  # Order notes
-    source_name = Column(String(100), nullable=True)  # web, mobile_app, etc.
+    tags = Column(String(500), nullable=True)
+    note = Column(Text, nullable=True)
+    source_name = Column(String(100), nullable=True)
     
     # Relationships
     order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -80,13 +87,23 @@ class OrderItem(Base):
     product_type = Column(String(100), nullable=True)
     sku = Column(String(100), nullable=True, index=True)
     
+    # NEW: Collections for this specific product
+    collections = Column(JSON, nullable=True)  # Store collections this product belongs to
+    collection_handles = Column(JSON, nullable=True)  # Store collection handles for easier querying
+    
     # Quantity and pricing
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Numeric(10, 2), nullable=False)
     total_discount = Column(Numeric(10, 2), nullable=True, default=0)
     
+    # NEW: Discount information per product
+    applied_discount_code = Column(String(100), nullable=True)  # Specific discount code applied to this item
+    discount_rate = Column(Numeric(5, 2), nullable=True)  # Discount percentage for this item
+    discount_amount = Column(Numeric(10, 2), nullable=True)  # Discount amount for this item
+    discount_type = Column(String(50), nullable=True)  # percentage, fixed_amount, etc.
+    
     # Product properties and customizations
-    properties = Column(JSON, nullable=True)  # Custom properties/personalizations
+    properties = Column(JSON, nullable=True)
     
     # Fulfillment details
     fulfillment_status = Column(String(50), nullable=True)

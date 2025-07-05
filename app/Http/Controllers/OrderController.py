@@ -1,11 +1,14 @@
 # app/Http/Controllers/OrderController.py
 from fastapi import HTTPException, status, Request, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict, Any, Optional
 import uuid
 import hmac
 import hashlib
 import json
+
+# Import here to avoid circular imports
+from app.Models.order_models import Order
 
 from app.Services.OrderService import OrderService
 from app.Schemas.order import (
@@ -42,14 +45,14 @@ class OrderController:
         return True
 
     @staticmethod
-    async def shopify_webhook_handler(
+    async def shopify_universal_webhook_handler(
         request: Request,
         background_tasks: BackgroundTasks,
         db: Session
     ) -> Dict[str, str]:
         """
-        Handle Shopify order webhook
-        Only processes orders that have discount codes
+        Universal Shopify webhook handler for all order operations
+        Handles: creation, updates, fulfillment, cancellation
         
         Args:
             request: FastAPI request object
@@ -62,6 +65,10 @@ class OrderController:
         try:
             # Get raw body for signature verification
             body = await request.body()
+            
+            # Get webhook topic from headers
+            webhook_topic = request.headers.get('X-Shopify-Topic', '')
+            logger.info(f"Received Shopify webhook with topic: {webhook_topic}")
             
             # Verify webhook signature (only if enabled and configured)
             if OrderController._should_verify_signature():
@@ -79,6 +86,36 @@ class OrderController:
             # Parse webhook data
             webhook_data = json.loads(body.decode('utf-8'))
             
+            # Route to appropriate handler based on webhook topic
+            if webhook_topic in ['orders/create', 'orders/updated', 'orders/paid']:
+                return await OrderController._handle_order_creation_update(webhook_data, background_tasks, db)
+            elif webhook_topic == 'orders/fulfilled':
+                return await OrderController._handle_order_fulfillment(webhook_data, background_tasks, db)
+            elif webhook_topic == 'orders/cancelled':
+                return await OrderController._handle_order_cancellation(webhook_data, background_tasks, db)
+            elif webhook_topic == 'orders/delete':
+                return await OrderController._handle_order_deletion(webhook_data, background_tasks, db)
+            else:
+                logger.warning(f"Unhandled webhook topic: {webhook_topic}")
+                return {"status": "ignored", "message": f"Webhook topic {webhook_topic} not handled"}
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in webhook: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid JSON payload"
+            )
+        except Exception as e:
+            logger.error(f"Error processing Shopify webhook: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process webhook"
+            )
+
+    @staticmethod
+    async def _handle_order_creation_update(webhook_data: dict, background_tasks: BackgroundTasks, db: Session) -> Dict[str, str]:
+        """Handle order creation and update webhooks"""
+        try:
             # Validate and create order data
             shopify_order = ShopifyWebhookOrder(**webhook_data)
             
@@ -95,7 +132,7 @@ class OrderController:
                     "message": f"Order {shopify_order.id} has no discount codes, not processed"
                 }
             
-            # Process order in background to respond quickly to Shopify
+            # Process order in background
             background_tasks.add_task(
                 OrderController._process_order_webhook,
                 shopify_order,
@@ -105,18 +142,75 @@ class OrderController:
             logger.info(f"Received Shopify webhook for order {shopify_order.id} with discount codes")
             return {"status": "received", "message": "Order webhook processed successfully"}
             
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in webhook: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid JSON payload"
-            )
         except Exception as e:
-            logger.error(f"Error processing Shopify webhook: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process webhook"
+            logger.error(f"Error handling order creation/update: {str(e)}")
+            raise
+
+    @staticmethod
+    async def _handle_order_fulfillment(webhook_data: dict, background_tasks: BackgroundTasks, db: Session) -> Dict[str, str]:
+        """Handle order fulfillment webhooks"""
+        try:
+            shopify_order_id = str(webhook_data.get('id'))
+            fulfillment_status = webhook_data.get('fulfillment_status', 'fulfilled')
+            
+            # Process fulfillment in background
+            background_tasks.add_task(
+                OrderService.mark_order_as_fulfilled,
+                shopify_order_id,
+                fulfillment_status,
+                db
             )
+            
+            logger.info(f"Order {shopify_order_id} marked for fulfillment processing")
+            return {"status": "received", "message": f"Order fulfillment webhook processed for order {shopify_order_id}"}
+            
+        except Exception as e:
+            logger.error(f"Error handling order fulfillment: {str(e)}")
+            raise
+
+    @staticmethod
+    async def _handle_order_cancellation(webhook_data: dict, background_tasks: BackgroundTasks, db: Session) -> Dict[str, str]:
+        """Handle order cancellation webhooks"""
+        try:
+            shopify_order_id = str(webhook_data.get('id'))
+            cancelled_at = webhook_data.get('cancelled_at')
+            cancel_reason = webhook_data.get('cancel_reason')
+            
+            # Process cancellation in background
+            background_tasks.add_task(
+                OrderService.mark_order_as_cancelled,
+                shopify_order_id,
+                cancelled_at,
+                cancel_reason,
+                db
+            )
+            
+            logger.info(f"Order {shopify_order_id} marked for cancellation processing")
+            return {"status": "received", "message": f"Order cancellation webhook processed for order {shopify_order_id}"}
+            
+        except Exception as e:
+            logger.error(f"Error handling order cancellation: {str(e)}")
+            raise
+
+    @staticmethod
+    async def _handle_order_deletion(webhook_data: dict, background_tasks: BackgroundTasks, db: Session) -> Dict[str, str]:
+        """Handle order deletion webhooks"""
+        try:
+            shopify_order_id = str(webhook_data.get('id'))
+            
+            # Process deletion in background
+            background_tasks.add_task(
+                OrderService.delete_order_by_shopify_id,
+                shopify_order_id,
+                db
+            )
+            
+            logger.info(f"Order {shopify_order_id} marked for deletion processing")
+            return {"status": "received", "message": f"Order deletion webhook processed for order {shopify_order_id}"}
+            
+        except Exception as e:
+            logger.error(f"Error handling order deletion: {str(e)}")
+            raise
 
     @staticmethod
     async def _process_order_webhook(shopify_order: ShopifyWebhookOrder, db: Session):
@@ -169,6 +263,66 @@ class OrderController:
             logger.error(f"Error verifying webhook signature: {str(e)}")
             return False
 
+    # Manual CRUD Operations
+    @staticmethod
+    async def create_order_manually(order_data: OrderCreate, db: Session) -> OrderResponse:
+        """
+        Manually create an order (not from webhook)
+        
+        Args:
+            order_data: Order creation data
+            db: Database session
+            
+        Returns:
+            OrderResponse: Created order
+        """
+        try:
+            order = await OrderService.create_order_manually(order_data, db)
+            return OrderResponse.model_validate(order)
+        except Exception as e:
+            logger.error(f"Error in create_order_manually controller: {str(e)}")
+            raise
+
+    @staticmethod
+    async def update_order_manually(order_id: uuid.UUID, order_data: OrderUpdate, db: Session) -> OrderResponse:
+        """
+        Manually update an order
+        
+        Args:
+            order_id: Order UUID
+            order_data: Order update data
+            db: Database session
+            
+        Returns:
+            OrderResponse: Updated order
+        """
+        try:
+            order = await OrderService.update_order_manually(order_id, order_data, db)
+            return OrderResponse.model_validate(order)
+        except Exception as e:
+            logger.error(f"Error in update_order_manually controller: {str(e)}")
+            raise
+
+    @staticmethod
+    async def delete_order_manually(order_id: uuid.UUID, db: Session) -> Dict[str, str]:
+        """
+        Manually delete an order
+        
+        Args:
+            order_id: Order UUID
+            db: Database session
+            
+        Returns:
+            Dict[str, str]: Success message
+        """
+        try:
+            await OrderService.delete_order_manually(order_id, db)
+            return {"status": "success", "message": f"Order {order_id} deleted successfully"}
+        except Exception as e:
+            logger.error(f"Error in delete_order_manually controller: {str(e)}")
+            raise
+
+    # Existing methods (keeping all your current functionality)
     @staticmethod
     async def get_all_orders(
         db: Session,
@@ -182,19 +336,6 @@ class OrderController:
     ) -> OrderListResponse:
         """
         Get all orders with pagination and filtering
-        
-        Args:
-            db: Database session
-            page: Page number
-            per_page: Results per page
-            sort_by: Column to sort by
-            sort_order: Sort direction
-            status_filter: Filter by order status
-            financial_status_filter: Filter by financial status
-            discount_code_filter: Filter by discount code used
-            
-        Returns:
-            OrderListResponse: Paginated order list
         """
         try:
             orders, total = await OrderService.get_all_orders(
@@ -219,36 +360,17 @@ class OrderController:
 
     @staticmethod
     async def get_order(order_id: uuid.UUID, db: Session) -> OrderResponse:
-        """
-        Get a specific order by ID
-        
-        Args:
-            order_id: Order UUID
-            db: Database session
-            
-        Returns:
-            OrderResponse: Order details
-        """
+        """Get a specific order by ID"""
         try:
             order = await OrderService.get_order_by_id(order_id, db)
             return OrderResponse.model_validate(order)
-            
         except Exception as e:
             logger.error(f"Error in get_order controller: {str(e)}")
             raise
 
     @staticmethod
     async def get_order_by_shopify_id(shopify_order_id: str, db: Session) -> OrderResponse:
-        """
-        Get a specific order by Shopify order ID
-        
-        Args:
-            shopify_order_id: Shopify order ID
-            db: Database session
-            
-        Returns:
-            OrderResponse: Order details
-        """
+        """Get a specific order by Shopify order ID"""
         try:
             order = await OrderService.get_order_by_shopify_id(shopify_order_id, db)
             
@@ -271,19 +393,10 @@ class OrderController:
 
     @staticmethod
     async def get_order_statistics(db: Session) -> OrderStatsResponse:
-        """
-        Get order statistics and insights
-        
-        Args:
-            db: Database session
-            
-        Returns:
-            OrderStatsResponse: Order statistics
-        """
+        """Get order statistics and insights"""
         try:
             stats = await OrderService.get_order_statistics(db)
             return OrderStatsResponse(**stats)
-            
         except Exception as e:
             logger.error(f"Error in get_order_statistics controller: {str(e)}")
             raise
@@ -295,18 +408,7 @@ class OrderController:
         page: int = 1,
         per_page: int = 20
     ) -> OrderListResponse:
-        """
-        Search orders by various criteria including discount codes
-        
-        Args:
-            db: Database session
-            search_term: Search term (order number, email, discount code, etc.)
-            page: Page number
-            per_page: Results per page
-            
-        Returns:
-            OrderListResponse: Search results
-        """
+        """Search orders by various criteria including discount codes"""
         try:
             from sqlalchemy import or_
             from app.Models.order_models import Order
@@ -321,7 +423,7 @@ class OrderController:
                 Order.customer_first_name.ilike(f"%{search_term}%"),
                 Order.customer_last_name.ilike(f"%{search_term}%"),
                 Order.shopify_order_id.ilike(f"%{search_term}%"),
-                Order.used_discount_code.ilike(f"%{search_term}%")  # Search by discount code
+                Order.used_discount_code.ilike(f"%{search_term}%")
             )
             
             # Get total count
@@ -359,22 +461,26 @@ class OrderController:
         page: int = 1,
         per_page: int = 20
     ) -> OrderListResponse:
-        """
-        Get orders that used a specific discount code
-        
-        Args:
-            db: Database session
-            discount_code: Discount code to search for
-            page: Page number
-            per_page: Results per page
-            
-        Returns:
-            OrderListResponse: Orders with the discount code
-        """
+        """Get orders that used a specific discount code"""
         try:
-            orders, total = await OrderService.get_orders_by_discount_code(
-                db, discount_code, page, per_page
-            )
+            
+            
+            # Calculate offset
+            offset = (page - 1) * per_page
+            
+            # CRITICAL FIX: Add joinedload to fetch order_items
+            search_filter = Order.used_discount_code.ilike(f"%{discount_code}%")
+            
+            # Get total count
+            total = db.query(Order).filter(search_filter).count()
+            
+            # Get results with order_items loaded using joinedload
+            orders = db.query(Order).options(joinedload(Order.order_items))\
+                .filter(search_filter)\
+                .order_by(Order.created_at.desc())\
+                .offset(offset)\
+                .limit(per_page)\
+                .all()
             
             # Calculate total pages
             total_pages = (total + per_page - 1) // per_page
@@ -396,15 +502,7 @@ class OrderController:
 
     @staticmethod
     async def get_discount_code_analytics(db: Session) -> Dict[str, Any]:
-        """
-        Get analytics for discount code usage
-        
-        Args:
-            db: Database session
-            
-        Returns:
-            Dict[str, Any]: Discount code analytics
-        """
+        """Get analytics for discount code usage"""
         try:
             from sqlalchemy import func, desc
             from datetime import datetime, timedelta
