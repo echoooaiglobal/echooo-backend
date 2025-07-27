@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from math import ceil
 
 from app.Models.results import Result
-from app.Models.campaign_models import Campaign
+from app.Models.campaigns import Campaign
 from app.Utils.Logger import logger
 import uuid
 

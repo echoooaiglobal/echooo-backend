@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import uuid
 
-# from app.Models.influencer_models import Platform, Category
 from app.Schemas.influencer import (
     PlatformCreate, PlatformUpdate, PlatformResponse,
     CategoryCreate, CategoryUpdate, CategoryResponse

@@ -1,7 +1,7 @@
-# app/Models/results_models.py
+# app/Models/results.py
 
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Integer, BigInteger, Numeric, func
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Integer, BigInteger, Numeric, func, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -32,6 +32,35 @@ class Result(Base):
     
     # Relationships
     campaign = relationship("Campaign", foreign_keys=[campaign_id])
+    
+    __table_args__ = (
+        # Campaign-based queries (very common)
+        Index('ix_results_campaign_id', 'campaign_id'),
+        
+        # Analytics and reporting queries
+        Index('ix_results_views_count', 'views_count'),
+        Index('ix_results_likes_count', 'likes_count'),
+        Index('ix_results_comments_count', 'comments_count'),
+        Index('ix_results_plays_count', 'plays_count'),
+        
+        # Date-based filtering and sorting
+        Index('ix_results_post_created_at', 'post_created_at'),
+        Index('ix_results_created_at', 'created_at'),
+        Index('ix_results_updated_at', 'updated_at'),
+        
+        # Composite indexes for common query patterns
+        Index('ix_results_campaign_username', 'campaign_id', 'influencer_username'),
+        Index('ix_results_campaign_post_date', 'campaign_id', 'post_created_at'),
+        Index('ix_results_username_post_date', 'influencer_username', 'post_created_at'),
+        
+        # Performance analytics queries
+        Index('ix_results_campaign_views', 'campaign_id', 'views_count'),
+        Index('ix_results_campaign_likes', 'campaign_id', 'likes_count'),
+        
+        # Descending indexes for "top performers" queries
+        Index('ix_results_views_desc', 'views_count', postgresql_ops={'views_count': 'DESC'}),
+        Index('ix_results_likes_desc', 'likes_count', postgresql_ops={'likes_count': 'DESC'}),
+    )
     
     def __repr__(self):
         return f"<Result(id={self.id}, campaign_id={self.campaign_id}, influencer_username='{self.influencer_username}', post_id='{self.post_id}')>"

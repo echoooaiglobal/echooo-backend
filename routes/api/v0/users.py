@@ -19,7 +19,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 async def get_all_users(
     skip: int = Query(0, ge=0, description="Number of users to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of users to return"),
-    user_type: Optional[str] = Query(None, description="Filter by user type (platform, company, influencer)"),
+    user_type: Optional[str] = Query(None, description="Filter by user type (platform, b2c, influencer)"),
     status: Optional[str] = Query(None, description="Filter by user status (active, inactive, pending, suspended)"),
     search: Optional[str] = Query(None, description="Search users by name or email"),
     current_user: User = Depends(has_permission("user:read")),
@@ -43,13 +43,13 @@ async def get_platform_users(
     """Get all platform users"""
     return await UserController.get_users_by_type("platform", db)
 
-@router.get("/company-users", response_model=List[UserDetailResponse])
-async def get_company_users(
+@router.get("/b2c-users", response_model=List[UserDetailResponse])  # Changed endpoint path
+async def get_b2c_users(  # Changed function name
     current_user: User = Depends(has_permission("user:read")),
     db: Session = Depends(get_db)
 ):
-    """Get all company users"""
-    return await UserController.get_users_by_type("company", db)
+    """Get all b2c users"""  # Changed docstring
+    return await UserController.get_users_by_type("b2c", db)  # Changed parameter
 
 @router.get("/influencers", response_model=List[UserDetailResponse])
 async def get_influencer_users(
@@ -88,9 +88,9 @@ async def update_user(
 
 @router.put("/{user_id}/status")
 async def update_user_status(
-    user_id: uuid.UUID,
+    user_id: uuid.UUID, 
     new_status: str,
-    current_user: User = Depends(has_role(["platform_admin"])),
+    current_user: User = Depends(has_role(["platform_super_admin", "platform_admin"])),
     db: Session = Depends(get_db)
 ):
     """Update user status (activate/deactivate/suspend)"""

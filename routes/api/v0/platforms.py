@@ -6,8 +6,6 @@ import uuid
 
 from app.Http.Controllers.PlatformController import PlatformController
 from app.Models.auth_models import User
-# Update this import if needed
-from app.Models.support_models import Platform, Category
 from app.Schemas.influencer import (
     PlatformCreate, PlatformUpdate, PlatformResponse,
     CategoryCreate, CategoryUpdate, CategoryResponse

@@ -45,7 +45,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
-    user_type: str = Field(..., pattern=r'^(platform|company|influencer)$')
+    user_type: str = Field(..., pattern=r'^(platform|b2c|influencer)$')
     company_id: Optional[str] = None  # Use str for UUID
     role_name: Optional[str] = None
 
@@ -68,7 +68,7 @@ class UserCreate(UserBase):
     
     @field_validator('user_type')
     def validate_user_type(cls, v):
-        valid_types = ['platform', 'company', 'influencer']
+        valid_types = ['platform', 'b2c', 'influencer']
         if v not in valid_types:
             raise ValueError(f'User type must be one of: {", ".join(valid_types)}')
         return v
@@ -77,8 +77,8 @@ class UserCreate(UserBase):
     @classmethod
     def validate_company_id(cls, v, info):
         # For Pydantic v2, data is accessed through info.data
-        if 'user_type' in info.data and info.data['user_type'] == 'company' and v is None:
-            raise ValueError('Company ID is required for company users')
+        if 'user_type' in info.data and info.data['user_type'] == 'b2c' and v is None:
+            raise ValueError('Company ID is required for b2c users')
         return v
 
 class UserUpdate(BaseModel):
@@ -268,11 +268,11 @@ class ResendVerificationRequest(BaseModel):
 # For development - Manual verification
 class ManualVerificationRequest(BaseModel):
     user_id: str
-    verification_type: str = Field(..., pattern=r'^(email|company|influencer)$')
+    verification_type: str = Field(..., pattern=r'^(email|b2c|influencer)$')
     
     @field_validator('verification_type')
     def validate_verification_type(cls, v):
-        valid_types = ['email', 'company', 'influencer']
+        valid_types = ['email', 'b2c', 'influencer']
         if v not in valid_types:
             raise ValueError(f'Verification type must be one of: {", ".join(valid_types)}')
         return v
@@ -315,6 +315,6 @@ class UserStatsResponse(BaseModel):
 # Extend existing UserUpdate for admin operations
 class AdminUserUpdate(UserUpdate):
     email: Optional[EmailStr] = None
-    user_type: Optional[str] = Field(None, pattern=r'^(platform|company|influencer)$')
+    user_type: Optional[str] = Field(None, pattern=r'^(platform|b2c|influencer)$') 
     status: Optional[str] = Field(None, pattern=r'^(active|inactive|pending|suspended)$')
     email_verified: Optional[bool] = None

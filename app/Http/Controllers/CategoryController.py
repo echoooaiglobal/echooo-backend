@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import uuid
 
-from app.Models.support_models import Category
 from app.Schemas.category import (
     CategoryCreate, CategoryUpdate, CategoryResponse, CategoryWithSubsResponse
 )

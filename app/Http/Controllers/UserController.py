@@ -59,8 +59,8 @@ class UserController:
                 user_data = UserDetailResponse.model_validate(user)
                 user_data.roles = [RoleResponse.model_validate(role) for role in user.roles]
                 
-                # Add company info for company users
-                if user.user_type == "company" and user.company_associations:
+                # Add company info for b2c users
+                if user.user_type == "b2c" and user.company_associations:
                     company_association = user.company_associations[0]  # Get first company
                     if company_association.company:
                         user_data.company = CompanyBriefResponse.model_validate(company_association.company)
@@ -86,12 +86,12 @@ class UserController:
                 user_data = UserDetailResponse.model_validate(user)
                 user_data.roles = [RoleResponse.model_validate(role) for role in user.roles]
                 
-                # Add company info for company users
-                if user.user_type == "company" and user.company_associations:
+                # Add company info for b2c users
+                if user.user_type == "b2c" and user.company_associations:
                     company_association = user.company_associations[0]
                     if company_association.company:
                         user_data.company = CompanyBriefResponse.model_validate(company_association.company)
-                
+                                
                 result.append(user_data)
             
             return result
@@ -108,7 +108,7 @@ class UserController:
             
             # Users by type
             platform_users = db.query(User).filter(User.user_type == "platform").count()
-            company_users = db.query(User).filter(User.user_type == "company").count()
+            company_users = db.query(User).filter(User.user_type == "b2c").count()
             influencer_users = db.query(User).filter(User.user_type == "influencer").count()
             
             # Users by status
@@ -128,7 +128,7 @@ class UserController:
                 "total_users": total_users,
                 "users_by_type": {
                     "platform": platform_users,
-                    "company": company_users,
+                    "b2c": company_users,
                     "influencer": influencer_users
                 },
                 "users_by_status": {
@@ -162,7 +162,7 @@ class UserController:
             user_data.roles = [RoleResponse.model_validate(role) for role in user.roles]
             
             # Add company info for company users
-            if user.user_type == "company" and user.company_associations:
+            if user.user_type == "b2c" and user.company_associations:
                 company_association = user.company_associations[0]
                 if company_association.company:
                     user_data.company = CompanyBriefResponse.model_validate(company_association.company)

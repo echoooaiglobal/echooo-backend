@@ -1,15 +1,11 @@
 # routes/api/v0/influencer_contacts.py
-# 
-# Add this import to your main.py file:
-# from routes.api.v0 import influencer_contacts
-#
-# Add this router inclusion to your main.py file:
-# app.include_router(influencer_contacts.router, prefix=settings.API_V0_STR)
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
-
+from sqlalchemy import func
+from app.Models.influencer_contacts import InfluencerContact
 from app.Http.Controllers.InfluencerContactController import InfluencerContactController
 from app.Models.auth_models import User
 from app.Schemas.influencer_contact import (
@@ -32,7 +28,7 @@ async def get_all_contacts(
     contact_type: Optional[str] = Query(None, description="Filter by contact type (email, phone, whatsapp, etc.)"),
     platform_id: Optional[str] = Query(None, description="Filter by platform ID"),
     is_primary: Optional[bool] = Query(None, description="Filter by primary contact status"),
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """
@@ -57,7 +53,7 @@ async def get_all_contacts(
 @router.get("/social-account/{social_account_id}", response_model=List[InfluencerContactResponse])
 async def get_contacts_by_social_account(
     social_account_id: uuid.UUID,
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """Get all contacts for a specific social account"""
@@ -68,7 +64,7 @@ async def get_contacts_by_social_account(
 @router.get("/{contact_id}", response_model=InfluencerContactResponse)
 async def get_contact(
     contact_id: uuid.UUID,
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """Get an influencer contact by ID"""
@@ -77,7 +73,7 @@ async def get_contact(
 @router.post("/", response_model=InfluencerContactResponse)
 async def create_contact(
     contact_data: InfluencerContactCreate,
-    current_user: User = Depends(has_permission("influencer_contacts:create")),
+    current_user: User = Depends(has_permission("influencer_contact:create")),
     db: Session = Depends(get_db)
 ):
     """
@@ -108,7 +104,7 @@ async def create_contact(
 @router.post("/bulk", response_model=InfluencerContactBulkResponse)
 async def bulk_create_contacts(
     bulk_data: InfluencerContactBulkCreate,
-    current_user: User = Depends(has_permission("influencer_contacts:create")),
+    current_user: User = Depends(has_permission("influencer_contact:create")),
     db: Session = Depends(get_db)
 ):
     """
@@ -141,7 +137,7 @@ async def bulk_create_contacts(
 async def update_contact(
     contact_id: uuid.UUID,
     contact_data: InfluencerContactUpdate,
-    current_user: User = Depends(has_permission("influencer_contacts:update")),
+    current_user: User = Depends(has_permission("influencer_contact:update")),
     db: Session = Depends(get_db)
 ):
     """
@@ -158,7 +154,7 @@ async def update_contact(
 @router.delete("/{contact_id}")
 async def delete_contact(
     contact_id: uuid.UUID,
-    current_user: User = Depends(has_permission("influencer_contacts:delete")),
+    current_user: User = Depends(has_permission("influencer_contact:delete")),
     db: Session = Depends(get_db)
 ):
     """Delete an influencer contact"""
@@ -168,7 +164,7 @@ async def delete_contact(
 
 @router.get("/types/list")
 async def get_contact_types(
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """Get list of supported contact types"""
@@ -195,7 +191,7 @@ async def get_contact_types(
 @router.get("/social-account/{social_account_id}/primary", response_model=List[InfluencerContactResponse])
 async def get_primary_contacts(
     social_account_id: uuid.UUID,
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """Get all primary contacts for a specific social account"""
@@ -211,7 +207,7 @@ async def get_primary_contacts(
 async def get_contacts_by_type(
     social_account_id: uuid.UUID,
     contact_type: str,
-    current_user: User = Depends(has_permission("influencer_contacts:read")),
+    current_user: User = Depends(has_permission("influencer_contact:read")),
     db: Session = Depends(get_db)
 ):
     """Get all contacts of a specific type for a social account"""
@@ -235,7 +231,7 @@ async def get_contacts_by_type(
 async def set_primary_contact(
     social_account_id: uuid.UUID,
     contact_id: uuid.UUID,
-    current_user: User = Depends(has_permission("influencer_contacts:update")),
+    current_user: User = Depends(has_permission("influencer_contact:update")),
     db: Session = Depends(get_db)
 ):
     """
@@ -270,8 +266,6 @@ async def get_contacts_stats(
 ):
     """Get overview statistics for influencer contacts (admin only)"""
     try:
-        from app.Models.influencer_models import InfluencerContact
-        from sqlalchemy import func
         
         # Total contacts
         total_contacts = db.query(InfluencerContact).count()

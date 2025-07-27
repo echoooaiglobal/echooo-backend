@@ -43,17 +43,17 @@ class CompanyService:
             db.refresh(company)
             
             # Add creator as a company admin
-            company_admin_role = db.query(Role).filter(Role.name == "company_admin").first()
-            if not company_admin_role:
+            b2c_company_owner_role = db.query(Role).filter(Role.name == "b2c_company_owner").first()
+            if not b2c_company_owner_role:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Company admin role not found"
+                    detail="B2C company admin role not found"
                 )
-            
+
             company_user = CompanyUser(
                 company_id=company.id,
                 user_id=created_by,
-                role_id=company_admin_role.id,
+                role_id=b2c_company_owner_role.id,
                 is_primary=True
             )
             

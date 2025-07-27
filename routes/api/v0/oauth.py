@@ -25,7 +25,7 @@ async def get_oauth_providers():
 async def oauth_login(
     provider: str,
     request: Request,
-    user_type: Optional[str] = Query(None, description="User type for new registrations (influencer, company, platform)")
+    user_type: Optional[str] = Query(None, description="User type for new registrations (influencer, b2c, platform)")
 ):
     """
     Initiate OAuth login flow with user type context
@@ -100,7 +100,7 @@ async def refresh_oauth_token(
     oauth_controller = OAuthController()
     
     try:
-        from app.Models.oauth_models import OAuthAccount
+        from app.Models.oauth_accounts import OAuthAccount
         from app.Services.OAuthService import OAuthService
         
         oauth_account = db.query(OAuthAccount).filter(

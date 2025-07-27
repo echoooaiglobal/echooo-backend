@@ -202,10 +202,10 @@ class EmailVerificationService:
                 user.status = UserStatus.ACTIVE.value
                 result["verifications"].append("email_verified")
                 
-            elif verification_type == "company" and user.user_type == "company":
+            elif verification_type == "b2c" and user.user_type == "b2c":
                 user.email_verified = True
                 user.status = UserStatus.ACTIVE.value
-                result["verifications"].append("company_verified")
+                result["verifications"].append("b2c_verified")
                 result["verifications"].append("email_verified")
                 
             elif verification_type == "influencer" and user.user_type == "influencer":

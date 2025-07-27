@@ -56,7 +56,14 @@ async def create_template(
     db: Session = Depends(get_db)
 ):
     """Create a new message template"""
-    return await MessageTemplateController.create_template(template_data, current_user, db)
+    try:
+        # Convert Pydantic model to dictionary
+        template_dict = template_data.model_dump()
+        return await MessageTemplateController.create_template(template_dict, current_user, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.put("/{template_id}", response_model=MessageTemplateResponse)
 async def update_template(

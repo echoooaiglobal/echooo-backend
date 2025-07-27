@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 from fastapi import HTTPException, status
 import uuid
 
-from app.Models.support_models import Platform, Category
+from app.Models.platforms import Platform
+from app.Models.categories import Category
 from app.Utils.Logger import logger
 
 class PlatformService:

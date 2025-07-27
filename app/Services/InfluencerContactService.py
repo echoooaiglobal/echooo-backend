@@ -5,8 +5,9 @@ from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 import uuid
 
-from app.Models.influencer_models import InfluencerContact, SocialAccount
-from app.Models.support_models import Platform
+from app.Models.influencer_contacts import InfluencerContact
+from app.Models.social_accounts import SocialAccount
+from app.Models.platforms import Platform
 from app.Models.auth_models import Role
 from app.Utils.Logger import logger
 

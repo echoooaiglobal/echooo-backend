@@ -1,4 +1,4 @@
-# routes/api/v0/campaigns.py
+# routes/api/v0/campaigns.py - Updated version
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -8,7 +8,7 @@ from app.Http.Controllers.CampaignController import CampaignController
 from app.Models.auth_models import User
 from app.Schemas.campaign import (
     CampaignCreate, CampaignUpdate, CampaignResponse,
-    CampaignListCreate, CampaignListUpdate, CampaignListResponse
+    CampaignListResponse
 )
 
 from app.Services.CampaignService import CampaignService
@@ -110,7 +110,7 @@ async def get_all_deleted_campaigns(
     """Get all soft deleted campaigns (for platform admins)"""
     return await CampaignController.get_all_deleted_campaigns(db)
 
-# Influencer List endpoints
+# Campaign List endpoints - Keep for backward compatibility
 @router.get("/{campaign_id}/lists", response_model=List[CampaignListResponse])
 async def get_campaign_lists(
     campaign_id: uuid.UUID,
@@ -119,13 +119,3 @@ async def get_campaign_lists(
 ):
     """Get all campaign lists for a campaign"""
     return await CampaignController.get_campaign_lists(campaign_id, db)
-
-@router.post("/{campaign_id}/lists", response_model=CampaignListResponse)
-async def create_list(
-    campaign_id: uuid.UUID,
-    list_data: CampaignListCreate,
-    current_user: User = Depends(has_permission("campaign:update")),
-    db: Session = Depends(get_db)
-):
-    """Create a new campaign list for a campaign"""
-    return await CampaignController.create_list(campaign_id, list_data, current_user, db)

@@ -8,32 +8,43 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from config.settings import settings
 from config.database import get_db, engine
-from app.Models import Base  # Import Base from our new Models package
+from app.Models import Base 
 from app.Utils.Logger import logger
-from app.Utils.db_init import initialize_default_roles_permissions
+from app.Utils.db_init import initialize_all_default_data
 from routes.api.v0 import (
-    auth, campaign_list_members, instagram, influencers, platforms, companies,
-    categories, campaigns, statuses, message_channels, agents, list_assignments, message_templates,
-    users, roles, permissions, assignments, influencer_contacts, results, profile_analytics, orders
+    auth, campaign_influencers, communication_channels, influencers, platforms, companies,
+    categories, campaigns, statuses, message_templates, system_settings, users, roles, permissions, 
+    influencer_contacts, results, profile_analytics, orders,
+    agent_assignments, assigned_influencers, influencer_assignment_histories, agent_social_connections,
+    campaign_lists, outreach_agents, bulk_assignments
 )
-from routes.api.v0 import oauth, agent_instagram
+from routes.api.v0 import oauth
+from app.Utils.startup import initialize_background_services, shutdown_background_services
+from routes.api.v0 import scheduler
 
 # Create FastAPI application context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Actions to perform during startup
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine, checkfirst=True)
     logger.info(f"{settings.APP_NAME} API starting up...")
     
-    # Initialize default roles and permissions
+    # Initialize ALL default data
     db = next(get_db())
-    initialize_default_roles_permissions(db)
+    initialize_all_default_data(db)
+
+    # Initialize background services
+    await initialize_background_services()
     
     yield
-    
+
     # Actions to perform during shutdown
     logger.info(f"{settings.APP_NAME} API shutting down...")
 
+    # Shutdown background services
+    await shutdown_background_services()
+    
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
@@ -90,26 +101,28 @@ app.include_router(users.router, prefix=settings.API_V0_STR)
 app.include_router(roles.router , prefix=settings.API_V0_STR) 
 app.include_router(permissions.router, prefix=settings.API_V0_STR)
 app.include_router(companies.router, prefix=settings.API_V0_STR)
-app.include_router(instagram.router, prefix=settings.API_V0_STR, tags=["Instagram Bot"])
 app.include_router(categories.router, prefix=settings.API_V0_STR)
 app.include_router(platforms.router, prefix=settings.API_V0_STR)
 app.include_router(influencers.router, prefix=settings.API_V0_STR)
 app.include_router(campaigns.router, prefix=settings.API_V0_STR)
+app.include_router(campaign_lists.router, prefix=settings.API_V0_STR)
 app.include_router(statuses.router, prefix=settings.API_V0_STR)
-app.include_router(message_channels.router, prefix=settings.API_V0_STR)
-app.include_router(agents.router, prefix=settings.API_V0_STR)
-app.include_router(campaign_list_members.router, prefix=settings.API_V0_STR)
-app.include_router(list_assignments.router, prefix=settings.API_V0_STR)
+app.include_router(communication_channels.router, prefix=settings.API_V0_STR)
+app.include_router(campaign_influencers.router, prefix=settings.API_V0_STR)
 app.include_router(message_templates.router, prefix=settings.API_V0_STR)
-app.include_router(assignments.router, prefix=settings.API_V0_STR)
 app.include_router(influencer_contacts.router, prefix=settings.API_V0_STR)
 app.include_router(results.router, prefix=settings.API_V0_STR)
 app.include_router(profile_analytics.router, prefix=settings.API_V0_STR)
 app.include_router(orders.router, prefix=settings.API_V0_STR)
-
 app.include_router(oauth.router, prefix=settings.API_V0_STR)
-app.include_router(agent_instagram.router, prefix=settings.API_V0_STR)
-
+app.include_router(scheduler.router, prefix=settings.API_V0_STR)
+app.include_router(agent_assignments.router, prefix=settings.API_V0_STR)
+app.include_router(assigned_influencers.router, prefix=settings.API_V0_STR)
+app.include_router(influencer_assignment_histories.router, prefix=settings.API_V0_STR)
+app.include_router(system_settings.router, prefix=settings.API_V0_STR)
+app.include_router(agent_social_connections.router, prefix=settings.API_V0_STR)
+app.include_router(outreach_agents.router, prefix=settings.API_V0_STR)
+app.include_router(bulk_assignments.router, prefix=settings.API_V0_STR)
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])

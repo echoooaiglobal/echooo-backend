@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from app.Models.oauth_models import OAuthAccount
+from app.Models.oauth_accounts import OAuthAccount
 from app.Models.auth_models import User
 from config.settings import settings
 from app.Utils.Logger import logger

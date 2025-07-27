@@ -17,7 +17,7 @@ router = APIRouter(prefix="/roles", tags=["Roles & Permissions"])
 
 @router.get("/", response_model=List[RoleDetailResponse])
 async def get_all_roles(
-    user_type: Optional[str] = Query(None, description="Filter roles by user type (platform, company, influencer)"),
+    user_type: Optional[str] = Query(None, description="Filter roles by user type (platform, b2c, influencer)"),
     current_user: User = Depends(has_role(["platform_admin"])),
     db: Session = Depends(get_db)
 ):
@@ -25,14 +25,14 @@ async def get_all_roles(
     Get all roles with their permissions, optionally filtered by user type
     
     Query Parameters:
-    - user_type: Filter roles by user type (platform, company, influencer)
+    - user_type: Filter roles by user type (platform, b2c, influencer)
       - platform: Returns roles like platform_admin, platform_user, platform_manager, etc.
-      - company: Returns roles like company_admin, company_user, company_manager, etc.
+      - b2c: Returns roles like b2c_company_admin, b2c_campaign_manager, b2c_marketing_director, etc.
       - influencer: Returns roles like influencer, influencer_manager
     """
     if user_type:
         # Validate user_type
-        valid_user_types = ["platform", "company", "influencer"]
+        valid_user_types = ["platform", "b2c", "influencer"]
         if user_type.lower() not in valid_user_types:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -52,14 +52,14 @@ async def get_roles_by_user_type(
     Get roles specific to a user type
     
     Path Parameters:
-    - user_type: The user type (platform, company, influencer)
+    - user_type: The user type (platform, b2c, influencer)
     
     Returns roles filtered by naming convention:
     - platform: platform_admin, platform_user, platform_manager, etc.
-    - company: company_admin, company_user, company_manager, etc.
+    - b2c: b2c_company_admin, b2c_campaign_manager, b2c_marketing_director, etc.
     - influencer: influencer, influencer_manager
     """
-    valid_user_types = ["platform", "company", "influencer"]
+    valid_user_types = ["platform", "b2c", "influencer"]
     if user_type.lower() not in valid_user_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

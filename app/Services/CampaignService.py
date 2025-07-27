@@ -4,8 +4,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
-from app.Models.campaign_models import Campaign, CampaignList, Status, ListAssignment
-from app.Models.support_models import Category
+from app.Models.campaigns import Campaign
+from app.Models.campaign_lists import CampaignList
+from app.Models.agent_assignments import AgentAssignment
+from app.Models.statuses import Status
+from app.Models.categories import Category
 from app.Utils.Logger import logger
 import uuid
 import re
@@ -24,7 +27,7 @@ class CampaignService:
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.agent_assignments).joinedload(AgentAssignment.status)
         )
         
         if not include_deleted:
@@ -43,7 +46,7 @@ class CampaignService:
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.agent_assignments).joinedload(AgentAssignment.status)
         ).filter(Campaign.company_id == company_id)
         
         if not include_deleted:
@@ -63,7 +66,7 @@ class CampaignService:
             joinedload(Campaign.status),
             joinedload(Campaign.campaign_lists),
             joinedload(Campaign.message_templates),
-            joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+            joinedload(Campaign.campaign_lists).joinedload(CampaignList.agent_assignments).joinedload(AgentAssignment.status)
         ).filter(Campaign.id == campaign_id)
         
         if not include_deleted:
@@ -111,7 +114,7 @@ class CampaignService:
                 joinedload(Campaign.status),
                 joinedload(Campaign.campaign_lists),
                 joinedload(Campaign.message_templates),
-                joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+                joinedload(Campaign.campaign_lists).joinedload(CampaignList.agent_assignments).joinedload(AgentAssignment.status)
             ).filter(
                 Campaign.company_id == company_id,
                 Campaign.is_deleted == True  # Only deleted campaigns
@@ -143,7 +146,7 @@ class CampaignService:
                 joinedload(Campaign.status),
                 joinedload(Campaign.campaign_lists),
                 joinedload(Campaign.message_templates),
-                joinedload(Campaign.campaign_lists).joinedload(CampaignList.assignments).joinedload(ListAssignment.status)
+                joinedload(Campaign.campaign_lists).joinedload(CampaignList.agent_assignments).joinedload(AgentAssignment.status)
             ).filter(Campaign.is_deleted == True).all()
             
             return campaigns
@@ -242,9 +245,6 @@ class CampaignService:
                 # Generate a suitable name for the list
                 campaign_name = campaign_data.get('name', 'Campaign')
                 list_name = f"{campaign_name} - Target Influencers"
-                
-                # Create influencer list data
-                from app.Models.campaign_models import CampaignList
                 
                 list_data = {
                     "campaign_id": campaign.id,

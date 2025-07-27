@@ -6,23 +6,47 @@ from sqlalchemy.orm import Session
 from app.Utils.Logger import logger
 from app.Models import (
     User, Role, Permission, RolePermission,
-    Platform, Category, UserStatus, user_roles, Status, MessageChannel
+    Platform, Category, UserStatus, user_roles, Status
+)
+from app.Models.communication_channels import CommunicationChannel
+from app.Models.reassignment_reasons import ReassignmentReason
+from app.Models.system_settings import Settings
+# Import dictionary data
+from app.Utils.dictionaries import (
+    DEFAULT_CATEGORIES, DEFAULT_PLATFORMS, DEFAULT_STATUSES, 
+    DEFAULT_COMMUNICATION_CHANNELS, DEFAULT_ROLES, DEFAULT_PERMISSIONS,
+    DEFAULT_REASSIGNMENT_REASONS, DEFAULT_SETTINGS, DEFAULT_ACCOUNTS
 )
 
-# Import dictionary data
-from app.Utils.dictionaries import DEFAULT_CATEGORIES, DEFAULT_PLATFORMS, DEFAULT_STATUSES, DEFAULT_MESSAGE_CHANNNELS, DEFAULT_ROLES, DEFAULT_PERMISSIONS
-
-def initialize_default_roles_permissions(db: Session):
+def initialize_default_roles(db: Session):
     """
-    Initialize database with default roles and permissions
+    Initialize database with default roles only
     """
     try:
+        logger.info("Initializing default roles...")
+        
         # Create default roles if they don't exist
         for role_data in DEFAULT_ROLES:
             role = db.query(Role).filter(Role.name == role_data["name"]).first()
             if not role:
                 role = Role(**role_data)
                 db.add(role)
+                logger.info(f"Added role: {role_data['name']}")
+        
+        db.commit()
+        logger.info("Default roles initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing roles: {str(e)}")
+        raise
+
+def initialize_default_permissions(db: Session):
+    """
+    Initialize database with default permissions only
+    """
+    try:
+        logger.info("Initializing default permissions...")
         
         # Create default permissions
         for perm_data in DEFAULT_PERMISSIONS:
@@ -30,325 +54,440 @@ def initialize_default_roles_permissions(db: Session):
             if not perm:
                 perm = Permission(**perm_data)
                 db.add(perm)
+                logger.info(f"Added permission: {perm_data['name']}")
         
         db.commit()
+        logger.info("Default permissions initialized successfully")
         
-        # Assign permissions to roles
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing permissions: {str(e)}")
+        raise
+
+def assign_permissions_to_roles(db: Session):
+    """
+    Assign permissions to roles based on role hierarchy
+    Updated for Phase 1: Platform, B2C, and Influencer roles only
+    """
+    try:
+        logger.info("Assigning permissions to roles...")
+        
+        # ========== PLATFORM ROLES ==========
+        platform_super_admin = db.query(Role).filter(Role.name == "platform_super_admin").first()
         platform_admin = db.query(Role).filter(Role.name == "platform_admin").first()
-        platform_user = db.query(Role).filter(Role.name == "platform_user").first()
-        company_admin = db.query(Role).filter(Role.name == "company_admin").first()
-        campaign_manager = db.query(Role).filter(Role.name == "company_campaign_manager").first()
-        company_user = db.query(Role).filter(Role.name == "company_user").first()
+        platform_manager = db.query(Role).filter(Role.name == "platform_manager").first()
+        platform_developer = db.query(Role).filter(Role.name == "platform_developer").first()
+        platform_customer_support = db.query(Role).filter(Role.name == "platform_customer_support").first()
+        platform_account_manager = db.query(Role).filter(Role.name == "platform_account_manager").first()
+        platform_financial_manager = db.query(Role).filter(Role.name == "platform_financial_manager").first()
+        platform_content_moderator = db.query(Role).filter(Role.name == "platform_content_moderator").first()
+        platform_data_analyst = db.query(Role).filter(Role.name == "platform_data_analyst").first()
+        platform_operations_manager = db.query(Role).filter(Role.name == "platform_operations_manager").first()
+        platform_agent = db.query(Role).filter(Role.name == "platform_agent").first()
+        
+        # ========== B2C COMPANY ROLES ==========
+        b2c_company_owner = db.query(Role).filter(Role.name == "b2c_company_owner").first()
+        b2c_company_admin = db.query(Role).filter(Role.name == "b2c_company_admin").first()
+        b2c_marketing_director = db.query(Role).filter(Role.name == "b2c_marketing_director").first()
+        b2c_campaign_manager = db.query(Role).filter(Role.name == "b2c_campaign_manager").first()
+        b2c_campaign_executive = db.query(Role).filter(Role.name == "b2c_campaign_executive").first()
+        b2c_social_media_manager = db.query(Role).filter(Role.name == "b2c_social_media_manager").first()
+        b2c_content_creator = db.query(Role).filter(Role.name == "b2c_content_creator").first()
+        b2c_brand_manager = db.query(Role).filter(Role.name == "b2c_brand_manager").first()
+        b2c_performance_analyst = db.query(Role).filter(Role.name == "b2c_performance_analyst").first()
+        b2c_finance_manager = db.query(Role).filter(Role.name == "b2c_finance_manager").first()
+        b2c_account_coordinator = db.query(Role).filter(Role.name == "b2c_account_coordinator").first()
+        b2c_viewer = db.query(Role).filter(Role.name == "b2c_viewer").first()
+        
+        # ========== INFLUENCER ROLES ==========
         influencer = db.query(Role).filter(Role.name == "influencer").first()
+        influencer_manager = db.query(Role).filter(Role.name == "influencer_manager").first()
         
         # Get all permissions
         all_permissions = db.query(Permission).all()
         
-        # Assign all permissions to platform_admin
-        if platform_admin:
-            for perm in all_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_admin.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_admin.id, permission_id=perm.id)
-                    db.add(role_perm)
-        
-        # Assign read permissions to platform_user
-        if platform_user:
-            read_permissions = db.query(Permission).filter(Permission.name.like("%:read")).all()
-            for perm in read_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_user.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_user.id, permission_id=perm.id)
-                    db.add(role_perm)
-        
-        # Assign company and campaign permissions to company_admin
-        if company_admin:
-            company_permissions = db.query(Permission).filter(
-                (Permission.name.like("company:%")) | 
-                (Permission.name.like("campaign:%")) |
-                (Permission.name.like("influencer:read")) |
-                (Permission.name.like("influencer_contacts:read"))
-            ).all()
-            
-            for perm in company_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_admin.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_admin.id, permission_id=perm.id)
-                    db.add(role_perm)
+        # Helper function to assign permissions to role
+        def assign_permissions_to_role(role, permissions):
+            if role:
+                for perm in permissions:
+                    role_perm = db.query(RolePermission).filter(
+                        RolePermission.role_id == role.id,
+                        RolePermission.permission_id == perm.id
+                    ).first()
+                    
+                    if not role_perm:
+                        role_perm = RolePermission(role_id=role.id, permission_id=perm.id)
+                        db.add(role_perm)
 
-        # Assign campaign manager permissions to campaign_manager
-        if campaign_manager:
-            campaign_permissions = db.query(Permission).filter(
-                (Permission.name.like("campaign:%")) |
-                (Permission.name == "influencer:read") |
-                (Permission.name == "influencer_contacts:read")
-            ).all()
-            
-            for perm in campaign_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == campaign_manager.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=campaign_manager.id, permission_id=perm.id)
-                    db.add(role_perm)
+        # ========== PLATFORM ROLE PERMISSIONS ==========
         
-        # Assign read permissions to company_user
-        if company_user:
-            company_read_permissions = db.query(Permission).filter(
-                (Permission.name == "company:read") | 
+        # Platform Super Admin - ALL permissions
+        if platform_super_admin:
+            assign_permissions_to_role(platform_super_admin, all_permissions)
+            logger.info("Assigned ALL permissions to platform_super_admin")
+
+        # Platform Admin - ALL permissions except super admin specific ones
+        if platform_admin:
+            assign_permissions_to_role(platform_admin, all_permissions)
+            logger.info("Assigned ALL permissions to platform_admin")
+
+        # Platform Manager - All except delete permissions
+        if platform_manager:
+            manager_permissions = db.query(Permission).filter(
+                ~Permission.name.like("%:delete")
+            ).all()
+            assign_permissions_to_role(platform_manager, manager_permissions)
+            logger.info("Assigned manager permissions to platform_manager")
+
+        # Platform Developer - ALL permissions for development
+        if platform_developer:
+            assign_permissions_to_role(platform_developer, all_permissions)
+            logger.info("Assigned ALL permissions to platform_developer")
+
+        # Platform Customer Support - Read permissions + specific support actions
+        if platform_customer_support:
+            support_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name == "user:update") |
+                (Permission.name == "user:verify") |
+                (Permission.name == "user:reset_password") |
+                (Permission.name == "support_ticket:create") |
+                (Permission.name == "support_ticket:update")
+            ).all()
+            assign_permissions_to_role(platform_customer_support, support_permissions)
+            logger.info("Assigned support permissions to platform_customer_support")
+
+        # Platform Account Manager - Account and relationship management
+        if platform_account_manager:
+            account_mgr_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("company:%")) |
+                (Permission.name.like("campaign:%")) |
+                (Permission.name.like("contract:%")) |
+                (Permission.name.like("subscription:%"))
+            ).all()
+            assign_permissions_to_role(platform_account_manager, account_mgr_permissions)
+            logger.info("Assigned account management permissions to platform_account_manager")
+
+        # Platform Financial Manager - Financial operations
+        if platform_financial_manager:
+            finance_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("payment:%")) |
+                (Permission.name.like("invoice:%")) |
+                (Permission.name.like("subscription:%")) |
+                (Permission.name.like("financial_report:%"))
+            ).all()
+            assign_permissions_to_role(platform_financial_manager, finance_permissions)
+            logger.info("Assigned financial permissions to platform_financial_manager")
+
+        # Platform Content Moderator - Content moderation
+        if platform_content_moderator:
+            moderator_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("content:%")) |
+                (Permission.name.like("campaign:update")) |
+                (Permission.name.like("influencer:update"))
+            ).all()
+            assign_permissions_to_role(platform_content_moderator, moderator_permissions)
+            logger.info("Assigned moderation permissions to platform_content_moderator")
+
+        # Platform Data Analyst - Analytics and reporting
+        if platform_data_analyst:
+            analyst_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("analytics:%")) |
+                (Permission.name.like("report:%"))
+            ).all()
+            assign_permissions_to_role(platform_data_analyst, analyst_permissions)
+            logger.info("Assigned analytics permissions to platform_data_analyst")
+
+        # Platform Operations Manager - Operations oversight
+        if platform_operations_manager:
+            ops_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("%:update")) |
+                (Permission.name.like("workflow:%")) |
+                (Permission.name.like("system_settings:%"))
+            ).all()
+            assign_permissions_to_role(platform_operations_manager, ops_permissions)
+            logger.info("Assigned operations permissions to platform_operations_manager")
+
+        # Platform Agent - Outreach and communication
+        if platform_agent:
+            agent_permissions = db.query(Permission).filter(
+                (Permission.name.like("%:read")) |
+                (Permission.name.like("influencer_outreach:%")) |
+                (Permission.name.like("communication:%")) |
+                (Permission.name == "influencer:update") |
+                (Permission.name == "influencer_contact:create") |
+                (Permission.name == "influencer_contact:update") |
+                # NEW: Add assigned_influencer permissions (excluding create and delete)
+                (Permission.name == "assigned_influencer:read") |
+                (Permission.name == "assigned_influencer:update") |
+                (Permission.name == "assigned_influencer:transfer") |
+                (Permission.name == "assigned_influencer:archive") |
+                (Permission.name == "assigned_influencer:bulk_update") |
+                (Permission.name == "influencer_contact:read") |
+                (Permission.name == "influencer_contact:create") |
+                (Permission.name == "influencer_contact:update") |
+                (Permission.name == "campaign_influencer:update")
+
+            ).all()
+            assign_permissions_to_role(platform_agent, agent_permissions)
+            logger.info("Assigned agent permissions to platform_agent")
+
+        # ========== B2C COMPANY ROLE PERMISSIONS ==========
+        
+        # B2C Company Owner - Full access to their company's data
+        if b2c_company_owner:
+            owner_permissions = db.query(Permission).filter(
+                (Permission.name.like("company:%")) |
+                (Permission.name.like("campaign:%")) |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("contract:%")) |
+                (Permission.name.like("payment:%")) |
+                (Permission.name.like("analytics:%")) |
+                (Permission.name.like("user:read")) |
+                (Permission.name.like("user:update"))
+            ).all()
+            assign_permissions_to_role(b2c_company_owner, owner_permissions)
+            logger.info("Assigned owner permissions to b2c_company_owner")
+
+        # B2C Company Admin - Administrative access
+        if b2c_company_admin:
+            admin_permissions = db.query(Permission).filter(
+                (Permission.name.like("company:%")) |
+                (Permission.name.like("campaign:%")) |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("user:read")) |
+                (Permission.name.like("user:update")) |
+                (Permission.name.like("analytics:%"))
+            ).all()
+            assign_permissions_to_role(b2c_company_admin, admin_permissions)
+            logger.info("Assigned admin permissions to b2c_company_admin")
+
+        # B2C Marketing Director - Strategic marketing oversight
+        if b2c_marketing_director:
+            marketing_dir_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name.like("campaign:%")) |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("analytics:%")) |
+                (Permission.name.like("strategy:%"))
+            ).all()
+            assign_permissions_to_role(b2c_marketing_director, marketing_dir_permissions)
+            logger.info("Assigned marketing director permissions to b2c_marketing_director")
+
+        # B2C Campaign Manager - Full campaign management
+        if b2c_campaign_manager:
+            campaign_mgr_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name.like("campaign:%")) |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("content:%")) |
+                (Permission.name.like("analytics:read"))
+            ).all()
+            assign_permissions_to_role(b2c_campaign_manager, campaign_mgr_permissions)
+            logger.info("Assigned campaign manager permissions to b2c_campaign_manager")
+
+        # B2C Campaign Executive - Campaign execution
+        if b2c_campaign_executive:
+            campaign_exec_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "campaign:read") |
+                (Permission.name == "campaign:update") |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name == "content:read") |
+                (Permission.name == "content:update")
+            ).all()
+            assign_permissions_to_role(b2c_campaign_executive, campaign_exec_permissions)
+            logger.info("Assigned campaign executive permissions to b2c_campaign_executive")
+
+        # B2C Social Media Manager - Social media and influencer management
+        if b2c_social_media_manager:
+            social_mgr_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "campaign:read") |
+                (Permission.name == "campaign:update") |
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("social_account:%")) |
+                (Permission.name.like("content:%"))
+            ).all()
+            assign_permissions_to_role(b2c_social_media_manager, social_mgr_permissions)
+            logger.info("Assigned social media manager permissions to b2c_social_media_manager")
+
+        # B2C Content Creator - Content creation and management
+        if b2c_content_creator:
+            content_creator_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
                 (Permission.name == "campaign:read") |
                 (Permission.name == "influencer:read") |
-                (Permission.name == "influencer_contacts:read")
+                (Permission.name == "influencer_contact:read") |
+                (Permission.name.like("content:%")) |
+                (Permission.name.like("asset:%"))
             ).all()
-            
-            for perm in company_read_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_user.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_user.id, permission_id=perm.id)
-                    db.add(role_perm)
+            assign_permissions_to_role(b2c_content_creator, content_creator_permissions)
+            logger.info("Assigned content creator permissions to b2c_content_creator")
+
+        # B2C Brand Manager - Brand management and guidelines
+        if b2c_brand_manager:
+            brand_mgr_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "company:update") |
+                (Permission.name == "campaign:read") |
+                (Permission.name == "campaign:update") |
+                (Permission.name == "influencer:read") |
+                (Permission.name.like("brand:%")) |
+                (Permission.name.like("content:%"))
+            ).all()
+            assign_permissions_to_role(b2c_brand_manager, brand_mgr_permissions)
+            logger.info("Assigned brand manager permissions to b2c_brand_manager")
+
+        # B2C Performance Analyst - Analytics and performance
+        if b2c_performance_analyst:
+            performance_analyst_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "campaign:read") |
+                (Permission.name == "influencer:read") |
+                (Permission.name.like("analytics:%")) |
+                (Permission.name.like("report:%")) |
+                (Permission.name.like("performance:%"))
+            ).all()
+            assign_permissions_to_role(b2c_performance_analyst, performance_analyst_permissions)
+            logger.info("Assigned performance analyst permissions to b2c_performance_analyst")
+
+        # B2C Finance Manager - Financial management
+        if b2c_finance_manager:
+            finance_mgr_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "campaign:read") |
+                (Permission.name.like("payment:%")) |
+                (Permission.name.like("invoice:%")) |
+                (Permission.name.like("budget:%")) |
+                (Permission.name.like("financial_report:%"))
+            ).all()
+            assign_permissions_to_role(b2c_finance_manager, finance_mgr_permissions)
+            logger.info("Assigned finance manager permissions to b2c_finance_manager")
+
+        # B2C Account Coordinator - Coordination and communication
+        if b2c_account_coordinator:
+            coordinator_permissions = db.query(Permission).filter(
+                (Permission.name == "company:read") |
+                (Permission.name == "campaign:read") |
+                (Permission.name == "campaign:update") |
+                (Permission.name == "influencer:read") |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("communication:%"))
+            ).all()
+            assign_permissions_to_role(b2c_account_coordinator, coordinator_permissions)
+            logger.info("Assigned coordinator permissions to b2c_account_coordinator")
+
+        # B2C Viewer - Read-only access
+        if b2c_viewer:
+            viewer_permissions = db.query(Permission).filter(
+                Permission.name.like("%:read")
+            ).all()
+            assign_permissions_to_role(b2c_viewer, viewer_permissions)
+            logger.info("Assigned viewer permissions to b2c_viewer")
+
+        # ========== INFLUENCER ROLE PERMISSIONS ==========
         
-        # Assign influencer permissions
+        # Influencer - Access to their own profile and campaigns
         if influencer:
             influencer_permissions = db.query(Permission).filter(
                 (Permission.name == "influencer:read") | 
                 (Permission.name == "influencer:update") |
-                (Permission.name == "influencer_contacts:read") |
-                (Permission.name == "influencer_contacts:create") |
-                (Permission.name == "influencer_contacts:update")
-            ).all()
-            
-            for perm in influencer_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == influencer.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=influencer.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_manager
-        platform_manager = db.query(Role).filter(Role.name == "platform_manager").first()
-        if platform_manager:
-            manager_permissions = db.query(Permission).filter(
-                ~Permission.name.like("%:delete")  # All except delete permissions
-            ).all()
-            
-            for perm in manager_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_manager.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_manager.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_accountant
-        platform_accountant = db.query(Role).filter(Role.name == "platform_accountant").first()
-        if platform_accountant:
-            read_permissions = db.query(Permission).filter(
-                Permission.name.like("%:read")
-            ).all()
-            
-            for perm in read_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_accountant.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_accountant.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_developer
-        platform_developer = db.query(Role).filter(Role.name == "platform_developer").first()
-        if platform_developer:
-            dev_permissions = db.query(Permission).all()  # Developers need access to everything for testing
-            
-            for perm in dev_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_developer.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_developer.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_customer_support
-        platform_support = db.query(Role).filter(Role.name == "platform_customer_support").first()
-        if platform_support:
-            support_permissions = db.query(Permission).filter(
-                Permission.name.like("%:read")
-            ).all()
-            
-            for perm in support_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_support.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_support.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_content_moderator
-        platform_moderator = db.query(Role).filter(Role.name == "platform_content_moderator").first()
-        if platform_moderator:
-            moderator_permissions = db.query(Permission).filter(
-                (Permission.name.like("%:read")) |
-                (Permission.name == "influencer:update") |
-                (Permission.name == "influencer_contacts:read") |
-                (Permission.name == "influencer_contacts:update")
-            ).all()
-            
-            for perm in moderator_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_moderator.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_moderator.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to platform_agent - INCLUDING NEW INFLUENCER_CONTACTS PERMISSIONS
-        platform_agent = db.query(Role).filter(Role.name == "platform_agent").first()
-        if platform_agent:
-            agent_permissions = db.query(Permission).filter(
-                (Permission.name.like("campaign:%")) |
-                (Permission.name == "influencer:read") |
-                (Permission.name == "influencer:update") |
-                # NEW: Add influencer_contacts permissions for platform_agent
-                (Permission.name == "influencer_contacts:read") |
-                (Permission.name == "influencer_contacts:create") |
-                (Permission.name == "influencer_contacts:update")
-            ).all()
-            
-            for perm in agent_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == platform_agent.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=platform_agent.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to company_manager
-        company_manager = db.query(Role).filter(Role.name == "company_manager").first()
-        if company_manager:
-            company_manager_permissions = db.query(Permission).filter(
-                (Permission.name.like("company:%")) |
-                (Permission.name.like("campaign:%")) |
-                (Permission.name == "influencer:read") |
-                (Permission.name == "influencer_contacts:read")
-            ).all()
-            
-            for perm in company_manager_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_manager.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_manager.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to company_accountant
-        company_accountant = db.query(Role).filter(Role.name == "company_accountant").first()
-        if company_accountant:
-            accountant_permissions = db.query(Permission).filter(
-                (Permission.name == "company:read") |
+                (Permission.name == "influencer_contact:read") |
+                (Permission.name == "influencer_contact:create") |
+                (Permission.name == "influencer_contact:update") |
+                (Permission.name == "social_account:read") |
+                (Permission.name == "social_account:update") |
                 (Permission.name == "campaign:read") |
-                (Permission.name == "influencer_contacts:read")
+                (Permission.name == "analytics:read") |
+                (Permission.name == "profile_analytics:read")
             ).all()
-            
-            for perm in accountant_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_accountant.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_accountant.id, permission_id=perm.id)
-                    db.add(role_perm)
+            assign_permissions_to_role(influencer, influencer_permissions)
+            logger.info("Assigned influencer permissions to influencer role")
 
-        # Assign permissions to company_marketer
-        company_marketer = db.query(Role).filter(Role.name == "company_marketer").first()
-        if company_marketer:
-            marketer_permissions = db.query(Permission).filter(
-                (Permission.name == "company:read") |
-                (Permission.name.like("campaign:%")) |
-                (Permission.name == "influencer:read") |
-                (Permission.name == "influencer_contacts:read")
-            ).all()
-            
-            for perm in marketer_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_marketer.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_marketer.id, permission_id=perm.id)
-                    db.add(role_perm)
-
-        # Assign permissions to company_content_creator
-        company_creator = db.query(Role).filter(Role.name == "company_content_creator").first()
-        if company_creator:
-            creator_permissions = db.query(Permission).filter(
-                (Permission.name == "company:read") |
+        # Influencer Manager - Manage multiple influencer accounts
+        if influencer_manager:
+            influencer_mgr_permissions = db.query(Permission).filter(
+                (Permission.name.like("influencer:%")) |
+                (Permission.name.like("influencer_contact:%")) |
+                (Permission.name.like("social_account:%")) |
                 (Permission.name == "campaign:read") |
-                (Permission.name == "influencer:read") |
-                (Permission.name == "influencer_contacts:read")
+                (Permission.name.like("analytics:read")) |
+                (Permission.name.like("profile_analytics:%"))
             ).all()
-            
-            for perm in creator_permissions:
-                role_perm = db.query(RolePermission).filter(
-                    RolePermission.role_id == company_creator.id,
-                    RolePermission.permission_id == perm.id
-                ).first()
-                
-                if not role_perm:
-                    role_perm = RolePermission(role_id=company_creator.id, permission_id=perm.id)
-                    db.add(role_perm)
+            assign_permissions_to_role(influencer_manager, influencer_mgr_permissions)
+            logger.info("Assigned influencer manager permissions to influencer_manager role")
         
-        # Initialize platforms from dictionary
-        logger.info("Initializing platforms from dictionary...")
+        db.commit()
+        logger.info("Permissions assigned to roles successfully for Phase 1 (Platform, B2C, Influencer)")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error assigning permissions to roles: {str(e)}")
+        raise
+
+def initialize_default_platforms(db: Session):
+    """
+    Initialize database with default platforms
+    """
+    try:
+        logger.info("Initializing default platforms...")
+        
         for platform_data in DEFAULT_PLATFORMS:
             platform = db.query(Platform).filter(Platform.name == platform_data["name"]).first()
             if not platform:
                 platform = Platform(**platform_data)
                 db.add(platform)
+                logger.info(f"Added platform: {platform_data['name']}")
+        
+        db.commit()
+        logger.info("Default platforms initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing platforms: {str(e)}")
+        raise
 
-        # Initialize default categories from dictionary
+def initialize_default_categories(db: Session):
+    """
+    Initialize database with default categories
+    """
+    try:
+        logger.info("Initializing default categories...")
+        
         for category_data in DEFAULT_CATEGORIES:
             category = db.query(Category).filter(Category.name == category_data["name"]).first()
             if not category:
                 category = Category(**category_data)
                 db.add(category)
+                logger.info(f"Added category: {category_data['name']}")
         
-        # Initialize statuses from dictionary
+        db.commit()
+        logger.info("Default categories initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing categories: {str(e)}")
+        raise
+
+def initialize_default_statuses(db: Session):
+    """
+    Initialize database with default statuses
+    """
+    try:
+        logger.info("Initializing default statuses...")
+        
         for status_data in DEFAULT_STATUSES:
             status = db.query(Status).filter(
                 Status.model == status_data["model"],
@@ -357,70 +496,249 @@ def initialize_default_roles_permissions(db: Session):
             if not status:
                 status = Status(**status_data)
                 db.add(status)
-
-        # Initialize default message channels from dictionary
-        for channel_data in DEFAULT_MESSAGE_CHANNNELS:
-            channel = db.query(MessageChannel).filter(MessageChannel.shortname == channel_data["shortname"]).first()
-            if not channel:
-                channel = MessageChannel(**channel_data)
-                db.add(channel)
-                
-        # Create default super-admin if none exists
-        try:
-            # First check if platform_admin role exists
-            admin_role = db.query(Role).filter(Role.name == "platform_admin").first()
-            if admin_role:
-                # Check if any user with platform_admin role already exists
-                admin_exists = db.query(User).join(user_roles).filter(
-                    user_roles.c.role_id == admin_role.id
-                ).first()
-                
-                if not admin_exists:
-                    # Import password utility for hashing
-                    from app.Http.Controllers.AuthController import AuthController
-                    
-                    # Default admin credentials
-                    admin_email = "admin@echooo.ai"
-                    admin_password = "Admin@123"  # In production, use a more secure default or generate one
-                    
-                    # Create the super admin user
-                    admin_user = User(
-                        email=admin_email,
-                        hashed_password=AuthController.get_password_hash(admin_password),
-                        full_name="System Administrator",
-                        user_type="platform",
-                        status=UserStatus.ACTIVE.value,
-                        email_verified=True
-                    )
-                    
-                    # Add the platform_admin role
-                    admin_user.roles.append(admin_role)
-                    
-                    db.add(admin_user)
-                    db.commit()
-                    db.refresh(admin_user)
-                    
-                    # Log the creation and credentials
-                    logger.info("==========================================================")
-                    logger.info("Default super-admin account created with the following credentials:")
-                    logger.info(f"Email: {admin_email}")
-                    logger.info(f"Password: {admin_password}")
-                    logger.info("IMPORTANT: Change these credentials immediately after first login!")
-                    logger.info("==========================================================")
-                else:
-                    logger.info("Super-admin already exists, skipping creation")
-            else:
-                logger.warning("Cannot create super-admin: platform_admin role not found")
-        
-        except Exception as e:
-            logger.error(f"Error creating super-admin: {str(e)}")
-            # Don't raise the exception here to allow the rest of the initialization to continue
-
+                logger.info(f"Added status: {status_data['name']} for {status_data['model']}")
         
         db.commit()
-        logger.info("Default roles, permissions, platforms, and categories initialized successfully")
+        logger.info("Default statuses initialized successfully")
         
     except Exception as e:
         db.rollback()
-        logger.error(f"Error initializing database defaults: {str(e)}")
+        logger.error(f"Error initializing statuses: {str(e)}")
+        raise
+
+def initialize_default_communication_channels(db: Session):
+    """
+    Initialize database with default communication channels
+    """
+    try:
+        logger.info("Initializing default communication channels...")
+        
+        for channel_data in DEFAULT_COMMUNICATION_CHANNELS:
+            # Resolve platform_id from platform name if it's not None
+            platform_id = channel_data.get("platform_id")
+            if platform_id is not None:
+                # Look up platform by name (case-insensitive)
+                platform = db.query(Platform).filter(
+                    Platform.name.ilike(platform_id)
+                ).first()
+                
+                if platform:
+                    platform_id = platform.id
+                    logger.info(f"Resolved platform name '{channel_data.get('platform_id')}' to UUID: {platform_id}")
+                else:
+                    logger.warning(f"Platform '{platform_id}' not found in database for channel '{channel_data['name']}'. Setting platform_id to None.")
+                    platform_id = None
+            
+            # Check if channel already exists
+            channel = db.query(CommunicationChannel).filter(
+                CommunicationChannel.code == channel_data["code"]
+            ).first()
+            
+            if not channel:
+                # Create new channel with resolved platform_id
+                channel = CommunicationChannel(
+                    name=channel_data["name"],
+                    code=channel_data["code"],
+                    platform_id=platform_id,
+                    is_active=channel_data.get("is_active", True),
+                    order=channel_data.get("order", 0),
+                    description=channel_data.get("description")
+                )
+                db.add(channel)
+                logger.info(f"Added communication channel: {channel_data['name']}")
+        
+        db.commit()
+        logger.info("Default communication channels initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing communication channels: {str(e)}")
+        raise
+
+def initialize_default_reassignment_reasons(db: Session):
+    """
+    Initialize database with default reassignment reasons
+    """
+    try:
+        logger.info("Initializing default reassignment reasons...")
+        
+        for reason_data in DEFAULT_REASSIGNMENT_REASONS:
+            reason = db.query(ReassignmentReason).filter(
+                ReassignmentReason.code == reason_data["code"]
+            ).first()
+            if not reason:
+                reason = ReassignmentReason(**reason_data)
+                db.add(reason)
+                logger.info(f"Added reassignment reason: {reason_data['name']}")
+        
+        db.commit()
+        logger.info("Default reassignment reasons initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing reassignment reasons: {str(e)}")
+        raise
+
+def initialize_default_system_settings(db: Session):
+    """
+    Initialize database with default system settings
+    """
+    try:
+        logger.info("Initializing default system settings...")
+        
+        for setting_data in DEFAULT_SETTINGS:
+            # Get platform_id from settings data
+            platform_id = setting_data.get("platform_id")
+            
+            # If platform_id is not None, look up the platform by name and get its UUID
+            if platform_id is not None:
+                # QUERY THE PLATFORM MODEL BY NAME
+                platform = db.query(Platform).filter(
+                    Platform.name.ilike(platform_id)
+                ).first()
+                
+                if platform:
+                    # GET THE ACTUAL UUID FROM THE PLATFORM MODEL
+                    platform_id = platform.id
+                    logger.info(f"Resolved platform name '{setting_data.get('platform_id')}' to UUID: {platform_id}")
+                else:
+                    logger.warning(f"Platform '{platform_id}' not found in database for setting '{setting_data['setting_key']}'. Setting platform_id to None.")
+                    platform_id = None
+            # If platform_id is None, keep it as None
+            
+            # Check if setting already exists
+            existing = db.query(Settings).filter(
+                Settings.setting_key == setting_data["setting_key"],
+                Settings.platform_id == platform_id,
+                Settings.applies_to_table == setting_data.get("applies_to_table")
+            ).first()
+            
+            if not existing:
+                # Handle created_by field
+                created_by = setting_data.get("created_by")
+                if isinstance(created_by, str) and created_by:
+                    created_by = uuid.UUID(created_by)
+                else:
+                    created_by = None
+                
+                # Create new setting with the resolved platform_id
+                new_setting = Settings(
+                    setting_key=setting_data["setting_key"],
+                    setting_value=setting_data["setting_value"],
+                    setting_type=setting_data["setting_type"],
+                    applies_to_table=setting_data.get("applies_to_table"),
+                    applies_to_field=setting_data.get("applies_to_field"),
+                    description=setting_data["description"],
+                    platform_id=platform_id,  # This is now the UUID from Platform table
+                    created_by=created_by,
+                    created_by_type=setting_data.get("created_by_type", "system")
+                )
+                db.add(new_setting)
+                logger.info(f"Added system setting: {setting_data['setting_key']}")
+        
+        db.commit()
+        logger.info("Default system settings initialized successfully")
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error initializing system settings: {str(e)}")
+        raise
+
+def create_default_accounts(db: Session):
+    """
+    Create default accounts from the dictionary
+    """
+    try:
+        logger.info("Creating default accounts...")
+        
+        for account_key, account_data in DEFAULT_ACCOUNTS.items():
+            # Check if role exists
+            role = db.query(Role).filter(Role.name == account_data["role_name"]).first()
+            if not role:
+                logger.warning(f"Cannot create {account_key}: role '{account_data['role_name']}' not found")
+                continue
+                
+            # Check if user with this role already exists
+            user_exists = db.query(User).join(user_roles).filter(
+                user_roles.c.role_id == role.id
+            ).first()
+            
+            if not user_exists:
+                # Import password utility for hashing
+                from app.Http.Controllers.AuthController import AuthController
+                
+                # Create the user
+                user = User(
+                    email=account_data["email"],
+                    hashed_password=AuthController.get_password_hash(account_data["password"]),
+                    full_name=account_data["full_name"],
+                    user_type=account_data["user_type"],
+                    phone_number=account_data.get("phone_number"),
+                    status=UserStatus.ACTIVE.value,
+                    email_verified=True
+                )
+                
+                # Add the role
+                user.roles.append(role)
+                
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                
+                # Log the creation and credentials
+                logger.info("==========================================================")
+                logger.info(f"Default {account_key} account created with the following credentials:")
+                logger.info(f"Email: {account_data['email']}")
+                logger.info(f"Password: {account_data['password']}")
+                logger.info("IMPORTANT: Change these credentials immediately after first login!")
+                logger.info("==========================================================")
+            else:
+                logger.info(f"{account_key} already exists, skipping creation")
+                
+    except Exception as e:
+        logger.error(f"Error creating default accounts: {str(e)}")
+        # Don't raise the exception here to allow the rest of the initialization to continue
+
+def initialize_all_default_data(db: Session):
+    """
+    Master function to initialize all default data in proper order
+    Call this from your main.py lifespan function
+    """
+    try:
+        logger.info("Starting initialization of all default data...")
+        
+        # 1. Initialize roles first (required for permission assignments)
+        initialize_default_roles(db)
+        
+        # 2. Initialize permissions (required for role-permission assignments)
+        initialize_default_permissions(db)
+        
+        # 3. Assign permissions to roles (requires both roles and permissions to exist)
+        assign_permissions_to_roles(db)
+        
+        # 4. Initialize platforms (may be referenced by other data)
+        initialize_default_platforms(db)
+        
+        # 5. Initialize categories (may be referenced by other data)
+        initialize_default_categories(db)
+        
+        # 6. Initialize system settings (may reference platforms)
+        initialize_default_system_settings(db)
+        
+        # 7. Initialize statuses (for various models)
+        initialize_default_statuses(db)
+        
+        # 8. Initialize communication channels
+        initialize_default_communication_channels(db)
+        
+        # 9. Initialize reassignment reasons
+        initialize_default_reassignment_reasons(db)
+        
+        # 10. Create default super admin (requires roles to exist)
+        create_default_accounts(db)
+        
+        logger.info("All default data initialized successfully!")
+        
+    except Exception as e:
+        logger.error(f"Error during default data initialization: {str(e)}")
         raise

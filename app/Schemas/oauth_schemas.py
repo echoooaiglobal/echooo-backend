@@ -92,7 +92,7 @@ class OAuthCallbackResponse(BaseModel):
     
     # Completion flags for OAuth registration flows
     needs_completion: Optional[bool] = False
-    completion_type: Optional[str] = None  # 'company', 'influencer', or None
+    completion_type: Optional[str] = None  # 'b2c', 'influencer', or None
     redirect_path: Optional[str] = None
 
 # Linked Accounts

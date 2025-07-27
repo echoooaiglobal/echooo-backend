@@ -6,9 +6,10 @@ from typing import List, Optional, Dict, Any
 import uuid
 import math
 
+from app.Models.platforms import Platform
+from app.Models.categories import Category
+from app.Models.social_accounts import SocialAccount
 from app.Models.profile_analytics import ProfileAnalytics
-from app.Models.support_models import Platform, Category
-from app.Models.influencer_models import SocialAccount
 from app.Schemas.profile_analytics import (
     ProfileAnalyticsCreate, ProfileAnalyticsUpdate, ProfileAnalyticsResponse,
     ProfileAnalyticsListResponse, ProfileAnalyticsStatsResponse,
@@ -16,7 +17,6 @@ from app.Schemas.profile_analytics import (
     ProfileAnalyticsWithSocialAccountResponse, SocialAccountWithAnalyticsResponse,
     SocialAccountForAnalyticsResponse, AnalyticsExistsResponse
 )
-from app.Schemas.influencer import SocialAccountResponse
 
 class ProfileAnalyticsController:
     

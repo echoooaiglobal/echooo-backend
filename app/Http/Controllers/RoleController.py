@@ -64,10 +64,12 @@ class RoleController:
             # Define role patterns for each user type
             role_patterns = {
                 "platform": ["platform_admin", "platform_user", "platform_manager", 
-                           "platform_accountant", "platform_developer", "platform_customer_support", 
-                           "platform_content_moderator", "platform_agent"],
-                "company": ["company_admin", "company_user", "company_manager", "company_campaign_manager",
-                          "company_accountant", "company_marketer", "company_content_creator"],
+                        "platform_accountant", "platform_developer", "platform_customer_support", 
+                        "platform_content_moderator", "platform_agent"],
+                "b2c": ["b2c_company_owner", "b2c_company_admin", "b2c_marketing_director", "b2c_campaign_manager",
+                    "b2c_campaign_executive", "b2c_social_media_manager", "b2c_content_creator", 
+                    "b2c_brand_manager", "b2c_performance_analyst", "b2c_finance_manager", 
+                    "b2c_account_coordinator", "b2c_viewer"],
                 "influencer": ["influencer", "influencer_manager"]
             }
             
@@ -144,7 +146,7 @@ class RoleController:
             # Define role patterns for each user type
             user_types = {
                 "platform": ["platform_%"],
-                "company": ["company_%"], 
+                "b2c": ["b2c_%"], 
                 "influencer": ["influencer", "influencer_%"]
             }
             
@@ -170,7 +172,7 @@ class RoleController:
                     "role_count": count,
                     "description": {
                         "platform": "Platform-specific roles for system administration and management",
-                        "company": "Company-specific roles for business users and teams",
+                        "b2c": "B2C company-specific roles for business users and teams",
                         "influencer": "Influencer-specific roles for content creators"
                     }.get(user_type, f"{user_type.title()} roles")
                 })

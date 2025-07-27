@@ -118,10 +118,10 @@ class AuthController:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Role '{role.name}' is not a platform role"
                 )
-            elif user_data.user_type == "company" and not role.name.startswith("company_"):
+            elif user_data.user_type == "b2c" and not role.name.startswith("b2c_"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Role '{role.name}' is not a company role"
+                    detail=f"Role '{role.name}' is not a b2c role"
                 )
             elif user_data.user_type == "influencer" and not (role.name == "influencer" or role.name == "influencer_manager"):
                 raise HTTPException(
@@ -132,8 +132,8 @@ class AuthController:
             # Default role assignment
             if user_data.user_type == "platform":
                 role = db.query(Role).filter(Role.name == "platform_user").first()
-            elif user_data.user_type == "company":
-                role = db.query(Role).filter(Role.name == "company_user").first()
+            elif user_data.user_type == "b2c":
+                role = db.query(Role).filter(Role.name == "b2c_company_admin").first()
             elif user_data.user_type == "influencer":
                 role = db.query(Role).filter(Role.name == "influencer").first()
             else:
@@ -159,7 +159,7 @@ class AuthController:
                 db.commit()
                 db.refresh(db_user)
                 
-            elif user_data.user_type == "company":
+            elif user_data.user_type == "b2c":
                 company_id = getattr(user_data, 'company_id', None)
                 company_name = getattr(user_data, 'company_name', None)
                 
@@ -204,9 +204,6 @@ class AuthController:
                             "name": company_name,
                             "domain": getattr(user_data, 'company_domain', None)
                         }
-                        
-                        # Import CompanyService if not already imported
-                        from app.Services.CompanyService import CompanyService
                         
                         # Create a new company
                         company = await CompanyService.create_company(
@@ -258,6 +255,7 @@ class AuthController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error registering user: {str(e)}"
             )
+
     @staticmethod
     async def create_admin(user_data: UserCreate, db: Session):
         """Create a new platform admin"""
@@ -346,7 +344,7 @@ class AuthController:
         
         # Get company info if user is a company user
         company = None
-        if user.user_type == "company":
+        if user.user_type == "b2c":
             # Find the company through CompanyUser association
             company_user = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
             if company_user:
@@ -434,7 +432,7 @@ class AuthController:
         
         # Send password reset email (background task)
         # background_tasks.add_task(send_password_reset_email, user.email, reset_token)
-        
+        return { "token": reset_token, "message": "If your email is registered, you will receive a password reset link" }
         return {"message": "If your email is registered, you will receive a password reset link"}
     
     @staticmethod
@@ -471,7 +469,7 @@ class AuthController:
         
         # Get company info if user is a company user
         company = None
-        if current_user.user_type == "company":
+        if current_user.user_type == "b2c":
             # Find the company through CompanyUser association
             company_user = db.query(CompanyUser).filter(CompanyUser.user_id == current_user.id).first()
             if company_user:
@@ -544,7 +542,7 @@ class AuthController:
     ):
         """Manually verify a user (development only)"""
         # Check if current user is platform admin
-        is_admin = any(role.name == "platform_admin" for role in current_user.roles)
+        is_admin = any(role.name == "platform_super_admin" or role.name == "platform_admin" for role in current_user.roles)
         if not is_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -631,9 +629,9 @@ class AuthController:
                     db.commit()
                     db.refresh(existing_company)
                     
-                    # Update user type if not already set
-                    if current_user.user_type != "company":
-                        current_user.user_type = "company"
+                    # Update user type if not already set to b2c
+                    if current_user.user_type != "b2c":
+                        current_user.user_type = "b2c"
                         db.commit()
                         db.refresh(current_user)
                     
@@ -654,11 +652,10 @@ class AuthController:
                     db.commit()
                     db.refresh(existing_company)
                     
-                    # Update user type if not already set
-                    if current_user.user_type != "company":
-                        current_user.user_type = "company"
+                    # Ensure user type is set to b2c
+                    if current_user.user_type != "b2c":
+                        current_user.user_type = "b2c"
                         db.commit()
-                        db.refresh(current_user)
                     
                     return {
                         "message": "Company registration completed successfully",
@@ -669,24 +666,24 @@ class AuthController:
             # No existing company association, create new company and association
             logger.info(f"Creating new company for user {current_user.id}")
             
-            # Set user type to company if not already set
-            if current_user.user_type != "company":
-                current_user.user_type = "company"
+            # Set user type to b2c if not already set
+            if current_user.user_type != "b2c":
+                current_user.user_type = "b2c"
             
-            # Ensure user has company_admin role
-            company_admin_role = db.query(Role).filter(Role.name == "company_admin").first()
+            # Ensure user has b2c_company_admin role
+            b2c_company_admin_role = db.query(Role).filter(Role.name == "b2c_company_admin").first()
             
-            if not company_admin_role:
+            if not b2c_company_admin_role:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Company admin role not found"
+                    detail="B2C company admin role not found"
                 )
             
-            # Add company_admin role if not already present
-            if company_admin_role not in current_user.roles:
-                # Clear existing roles and add company_admin role
+            # Add b2c_company_admin role if not already present
+            if b2c_company_admin_role not in current_user.roles:
+                # Clear existing roles and add b2c_company_admin role
                 current_user.roles.clear()
-                current_user.roles.append(company_admin_role)
+                current_user.roles.append(b2c_company_admin_role)
             
             # Create company using CompanyService
             from app.Services.CompanyService import CompanyService

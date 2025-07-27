@@ -236,7 +236,7 @@ async def is_company_admin(
     
     # Check if user is a company admin for this company
     for role in current_user.roles:
-        if role.name == "company_admin":
+        if role.name == "b2c_company_admin":
             for company_user in current_user.company_associations:
                 if company_user.company_id == company_id:
                     return current_user
@@ -244,7 +244,5 @@ async def is_company_admin(
     # User is not an admin of this company
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Only company admins can access this resource"
+        detail="Only company owner & admins can access this resource"
     )
-    
-    return company_admin_checker

@@ -1,5 +1,5 @@
 # app/Http/Controllers/MessageTemplateController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import uuid
@@ -54,34 +54,27 @@ class MessageTemplateController:
     
     @staticmethod
     async def create_template(
-        template_data: MessageTemplateCreate,
+        template_data: Dict[str, Any],
         current_user: User,
         db: Session
-    ):
+    ) -> MessageTemplateResponse:
         """Create a new message template"""
         try:
-            result = await MessageTemplateService.create_template(
-                template_data.model_dump(exclude_unset=True),
-                current_user.id,
-                db
-            )
+            # Service now only creates the template, no assignment logic
+            template = await MessageTemplateService.create_template(template_data, current_user.id, db)
             
-            # Always return just the template, regardless of assignment result
-            if isinstance(result, dict) and "template" in result:
-                template = result["template"]
-                assignment_info = result.get("assignment")
-                
-                # Log assignment info for debugging
-                if assignment_info:
-                    logger.info(f"Assignment created: {assignment_info}")
-                
-                return MessageTemplateResponse.model_validate(template)
-            else:
-                return MessageTemplateResponse.model_validate(result)
-                
+            # Convert SQLAlchemy object to Pydantic response model
+            return MessageTemplateResponse.model_validate(template)
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions from service
+            raise
         except Exception as e:
             logger.error(f"Error in create_template controller: {str(e)}")
-            raise
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error creating message template"
+            )
     
     @staticmethod
     async def update_template(

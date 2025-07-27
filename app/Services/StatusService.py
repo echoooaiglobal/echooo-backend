@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 import uuid
 
-from app.Models.campaign_models import Status
+from app.Models.statuses import Status
 from app.Utils.Logger import logger
 
 class StatusService:

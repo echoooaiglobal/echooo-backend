@@ -4,8 +4,6 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import uuid
 
-from app.Models.auth_models import User
-from app.Models.influencer_models import Influencer, SocialAccount, InfluencerContact
 from app.Schemas.influencer import (
     InfluencerCreate, InfluencerUpdate, InfluencerResponse,
     SocialAccountCreate, SocialAccountUpdate, SocialAccountResponse,

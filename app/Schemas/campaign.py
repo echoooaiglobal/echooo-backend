@@ -33,7 +33,7 @@ class StatusResponse(StatusBase):
 # MessageChannel schemas
 class MessageChannelBase(BaseModel):
     name: str  # Full name of the channel (e.g. "Direct Message")
-    shortname: str  # Abbreviation (e.g. "DM", "Story")
+    code: str  # Abbreviation (e.g. "DM", "Story")
     description: Optional[str] = None  # Optional details or internal notes
 
 class MessageChannelCreate(MessageChannelBase):
@@ -41,7 +41,7 @@ class MessageChannelCreate(MessageChannelBase):
 
 class MessageChannelUpdate(BaseModel):
     name: Optional[str] = None
-    shortname: Optional[str] = None
+    code: Optional[str] = None
     description: Optional[str] = None
 
 class MessageChannelResponse(MessageChannelBase):
@@ -153,6 +153,15 @@ class CampaignListBrief(BaseModel):
     name: str
     description: Optional[str] = None
     
+    # Influencer statistics for this specific list
+    total_influencers_count: int = 0
+    total_onboarded_count: int = 0
+    total_contacted_count: int = 0
+    avg_collaboration_price: Optional[float] = None
+    completion_percentage: float = 0.0
+    days_since_created: int = 0
+    last_activity_date: Optional[datetime] = None
+    
     model_config = {"from_attributes": True}
     
     @field_validator('id', mode='before')
@@ -160,12 +169,15 @@ class CampaignListBrief(BaseModel):
     def convert_uuid_to_str(cls, v):
         if isinstance(v, uuid.UUID):
             return str(v)
-        return v   
+        return v
 
 class MessageTemplatesBrief(BaseModel):
     id: str
-    subject: str
+    subject: Optional[str] = None
     content: str
+    template_type: Optional[str]
+    followup_sequence: Optional[int] = None
+    followup_delay_hours: Optional[int] = None
     company_id: str
     campaign_id: str
     is_global: bool = False
@@ -184,8 +196,8 @@ class MessageTemplatesBrief(BaseModel):
     
 class ListAssignmentBrief(BaseModel):
     id: str
-    list_id: str
-    agent_id: str
+    campaign_list_id: str  # Changed from list_id to match AgentAssignment model
+    outreach_agent_id: str  # Changed from agent_id to match AgentAssignment model
     status_id: str
     created_at: datetime
     updated_at: datetime
@@ -194,7 +206,7 @@ class ListAssignmentBrief(BaseModel):
     
     model_config = {"from_attributes": True}
     
-    @field_validator('id', 'list_id', 'agent_id', 'status_id', mode='before')
+    @field_validator('id', 'campaign_list_id', 'outreach_agent_id', 'status_id', mode='before')
     @classmethod
     def convert_uuid_to_str(cls, v):
         if isinstance(v, uuid.UUID):
@@ -202,19 +214,22 @@ class ListAssignmentBrief(BaseModel):
         return v
 
 class CampaignResponse(CampaignBase):
-    id: str  # UUID as string
-    created_by: str  # FK -> users.id
-    default_filters: bool  # Include in response for frontend logic
-    is_deleted: bool = False  # Include soft delete status
+    id: str
+    created_by: str
+    default_filters: bool
+    is_deleted: bool = False
     deleted_at: Optional[datetime] = None
-    deleted_by: Optional[str] = None  # UUID as string
+    deleted_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    category: Optional[CategoryBrief] = None  # Include category info
-    status: Optional[StatusBrief] = None  # Include status info
-    campaign_lists: List[CampaignListBrief] = []  # Include influencer lists
+    
+    # Relationship fields
+    category: Optional[CategoryBrief] = None
+    status: Optional[StatusBrief] = None
+    campaign_lists: List[CampaignListBrief] = []  # Contains detailed stats per list
     message_templates: List[MessageTemplatesBrief] = []
     list_assignments: List[ListAssignmentBrief] = []
+    
     model_config = {"from_attributes": True}
     
     @field_validator('id', 'company_id', 'created_by', 'category_id', 'status_id', 'deleted_by', mode='before')
@@ -293,21 +308,24 @@ class ListAssignmentResponse(BaseModel):
 
 # InfluencerOutreach schemas
 class InfluencerOutreachBase(BaseModel):
-    social_account_id: str  # FK -> influencers.id
-    list_id: str  # FK -> influencer_lists.id
-    list_member_id: str  # FK -> influencer_list_members.id
-    assignment_id: Optional[str] = None  # FK -> list_assignments.id
-    message_channel_id: Optional[str] = None  # FK -> message_channels.id
-    message_status_id: Optional[str] = None  # FK -> statuses.id
-    message_sent_at: Optional[datetime] = None  # When message was sent
-    error_code: Optional[str] = None  # Error code if outreach failed
-    error_reason: Optional[str] = None  # Reason or message of the error
+    assigned_influencer_id: str = Field(..., description="ID of the assigned influencer")
+    agent_assignment_id: Optional[str] = Field(default=None, description="ID of the agent assignment")
+    outreach_agent_id: str = Field(..., description="ID of the outreach agent")
+    agent_social_connection_id: Optional[str] = Field(default=None, description="ID of the agent social connection")
+    communication_channel_id: Optional[str] = Field(default=None, description="ID of the communication channel")
+    message_status_id: Optional[str] = Field(default=None, description="ID of the message status")
+    message_sent_at: Optional[datetime] = Field(default=None, description="When message was sent")
+    error_code: Optional[str] = Field(default=None, description="Error code if message failed")
+    error_reason: Optional[str] = Field(default=None, description="Detailed error reason")
 
 class InfluencerOutreachCreate(InfluencerOutreachBase):
     pass
 
 class InfluencerOutreachUpdate(BaseModel):
-    message_channel_id: Optional[str] = None
+    agent_assignment_id: Optional[str] = None
+    outreach_agent_id: Optional[str] = None
+    agent_social_connection_id: Optional[str] = None
+    communication_channel_id: Optional[str] = None
     message_status_id: Optional[str] = None
     message_sent_at: Optional[datetime] = None
     error_code: Optional[str] = None
@@ -320,10 +338,11 @@ class InfluencerOutreachResponse(InfluencerOutreachBase):
     
     model_config = {"from_attributes": True}
     
-    @field_validator('id', 'social_account_id', 'list_id', 'list_member_id', 
-                    'assignment_id', 'message_channel_id', 'message_status_id', mode='before')
+    @field_validator('id', 'assigned_influencer_id', 'agent_assignment_id', 
+                    'outreach_agent_id', 'agent_social_connection_id', 
+                    'communication_channel_id', 'message_status_id', mode='before')
     @classmethod
     def convert_uuid_to_str(cls, v):
-        if isinstance(v, uuid.UUID):
+        if v is not None and isinstance(v, uuid.UUID):
             return str(v)
         return v

@@ -1,52 +1,59 @@
 # app/Models/__init__.py
-from app.Models.base import Base
+
+from .base import Base
+
+# Existing models
 from app.Models.auth_models import (
     User, Role, Permission, RolePermission, RefreshToken, EmailVerificationToken,
     UserStatus, user_roles
 )
-from app.Models.oauth_models import (
-    OAuthAccount, AgentSocialConnection
-)
-from app.Models.company_models import (
-    Company, CompanyUser, CompanyContact
-)
-from app.Models.influencer_models import (
-    Influencer, SocialAccount, InfluencerContact
-)
-from app.Models.support_models import (
-    Platform, Category
-)
-from app.Models.campaign_models import (
-    Status, MessageChannel, Agent, Campaign, 
-    CampaignList, 
-    ListAssignment, InfluencerOutreach
-)
-from app.Models.message_templates import (
-    MessageTemplate
-)
-from app.Models.campaign_list_members import (
-    CampaignListMember
-)
-from app.Models.results import (
-    Result
-)
+from app.Models.oauth_accounts import OAuthAccount
+from app.Models.company_models import Company, CompanyUser
+from app.Models.influencers import Influencer
+from app.Models.social_accounts import SocialAccount
+from app.Models.influencer_contacts import InfluencerContact
+from app.Models.campaigns import Campaign
+from app.Models.message_templates import MessageTemplate
+from app.Models.campaign_lists import CampaignList
+from app.Models.statuses import Status
+from app.Models.influencer_outreach import InfluencerOutreach
+from app.Models.order_models import Order, OrderItem
+from app.Models.platforms import Platform
+from app.Models.categories import Category
 
-# This makes it easier to import models elsewhere
+# New outreach models
+from app.Models.system_settings import Settings
+from app.Models.communication_channels import CommunicationChannel
+from app.Models.outreach_agents import OutreachAgent
+from app.Models.agent_social_connections import AgentSocialConnection
+from app.Models.agent_assignments import AgentAssignment
+from app.Models.automation_sessions import AutomationSession
+from app.Models.campaign_influencers import CampaignInfluencer
+from app.Models.assigned_influencers import AssignedInfluencer
+from app.Models.reassignment_reasons import ReassignmentReason
+from app.Models.influencer_assignment_histories import InfluencerAssignmentHistory
+
 __all__ = [
     'Base',
-    # Auth models
+    # Existing models
     'User', 'Role', 'Permission', 'RolePermission', 'RefreshToken', 'UserStatus', 'EmailVerificationToken',
     'user_roles',
-    # OAuth models (NEW)
-    'OAuthAccount', 'AgentSocialConnection',
-    # Company models
-    'Company', 'CompanyUser', 'CompanyContact',
-    # Influencer models
+    'OAuthAccount',
+    'Company', 'CompanyUser',
     'Influencer', 'SocialAccount', 'InfluencerContact',
-    # Support models
-    'Platform', 'Category',
-    # Campaign models
-    'Status', 'MessageChannel', 'Agent', 'Campaign',
-    'CampaignList', 'CampaignListMember', 'MessageTemplate',
-    'ListAssignment', 'InfluencerOutreach', 'Result'
+    'Campaign', 'CampaignList', 'MessageTemplate',
+    'Status', 'InfluencerOutreach',
+    'Order', 'OrderItem',
+    'Platform', 'Category', 'Permission', 'RolePermission',
+    # New outreach models
+    'Settings',
+    'CommunicationChannel',
+    'OutreachAgent',
+    'AgentSocialConnection', 
+    'AgentAssignment',
+    'AutomationSession',
+    'CampaignInfluencer',
+    'AssignedInfluencer',
+    'ReassignmentReason',
+    'InfluencerAssignmentHistory'
 ]

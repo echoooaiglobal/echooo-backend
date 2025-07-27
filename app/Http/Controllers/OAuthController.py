@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from app.Services.OAuthService import OAuthService
 from app.Http.Controllers.AuthController import AuthController
 from app.Models.auth_models import User, UserStatus, Role
-from app.Models.oauth_models import OAuthAccount
+from app.Models.oauth_accounts import OAuthAccount
 from app.Models.company_models import Company, CompanyUser
 from app.Schemas.auth import RoleResponse, CompanyBriefResponse, UserResponse
 from app.Utils.Logger import logger
@@ -68,8 +68,8 @@ class OAuthController:
             
             # FIXED: Handle None user_type properly (from login page)
             role_name = None
-            if user_type == 'company':
-                role_name = 'company_admin'  # Company registration creates admin
+            if user_type == 'b2c':
+                role_name = 'b2c_company_admin'  # B2C registration creates admin
             elif user_type == 'influencer':
                 role_name = 'influencer'     # Influencer registration creates influencer
             elif user_type == 'platform':
@@ -246,9 +246,9 @@ class OAuthController:
         # Get user roles in proper format
         roles = [RoleResponse.model_validate(role) for role in user.roles]
         
-        # Get company info if user is a company user
+        # Get company info if user is a b2c user
         company = None
-        if user.user_type == "company":
+        if user.user_type == "b2c":
             company_user = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
             if company_user:
                 company = db.query(Company).filter(Company.id == company_user.company_id).first()
@@ -268,7 +268,7 @@ class OAuthController:
             "provider": provider,
             "login_method": "oauth_login",
             "needs_completion": False,
-            "redirect_path": "/campaigns" if user.user_type == "company" else "/dashboard"
+            "redirect_path": "/campaigns" if user.user_type == "b2c" else "/dashboard"
         }
 
     async def _handle_existing_user_login(self, user: User, provider: str, token_data: Dict, user_info: Dict, db: Session) -> Dict:
@@ -295,7 +295,7 @@ class OAuthController:
         
         # Get company info if user is a company user
         company = None
-        if user.user_type == "company":
+        if user.user_type == "b2c":
             company_user = db.query(CompanyUser).filter(CompanyUser.user_id == user.id).first()
             if company_user:
                 company = db.query(Company).filter(Company.id == company_user.company_id).first()
@@ -314,7 +314,7 @@ class OAuthController:
             "provider": provider,
             "login_method": "oauth_login_and_link",
             "needs_completion": False,
-            "redirect_path": "/campaigns" if user.user_type == "company" else "/dashboard"
+            "redirect_path": "/campaigns" if user.user_type == "b2c" else "/dashboard"
         }
 
     async def _handle_new_user_registration(self, user_type: str, role_name: str, provider: str, token_data: Dict, user_info: Dict, db: Session) -> Dict:
@@ -348,8 +348,8 @@ class OAuthController:
         db.flush()  # Get the user ID
         
         # Handle user type specific setup
-        if user_type == "company":
-            # For company users, create placeholder company
+        if user_type == "b2c":
+            # For b2c users, create placeholder company
             try:
                 from app.Services.CompanyService import CompanyService
                 
@@ -401,15 +401,15 @@ class OAuthController:
         
         # Get company info if created
         company = None
-        if user_type == "company":
+        if user_type == "b2c":
             company_user = db.query(CompanyUser).filter(CompanyUser.user_id == new_user.id).first()
             if company_user:
                 company = db.query(Company).filter(Company.id == company_user.company_id).first()
         
         # Determine completion needs
-        needs_completion = user_type == "company"
-        completion_type = "company" if user_type == "company" else None
-        redirect_path = "/register/complete?type=company" if needs_completion else ("/campaigns" if user_type == "company" else "/dashboard")
+        needs_completion = user_type == "b2c"
+        completion_type = "b2c" if user_type == "b2c" else None
+        redirect_path = "/register/complete?type=b2c" if needs_completion else ("/campaigns" if user_type == "b2c" else "/dashboard")
         
         # Return complete registration response
         return {

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 import uuid
 
-from app.Models.campaign_models import MessageChannel
+from app.Models.communication_channels import CommunicationChannel
 from app.Utils.Logger import logger
 
 class MessageChannelService:
@@ -20,9 +20,9 @@ class MessageChannelService:
             db: Database session
             
         Returns:
-            List[MessageChannel]: List of all message channels
+            List[CommunicationChannel]: List of all message channels
         """
-        return db.query(MessageChannel).all()
+        return db.query(CommunicationChannel).all()
     
     @staticmethod
     async def get_channel_by_id(channel_id: uuid.UUID, db: Session):
@@ -34,9 +34,9 @@ class MessageChannelService:
             db: Database session
             
         Returns:
-            MessageChannel: The message channel if found
+            CommunicationChannel: The message channel if found
         """
-        channel = db.query(MessageChannel).filter(MessageChannel.id == channel_id).first()
+        channel = db.query(CommunicationChannel).filter(CommunicationChannel.id == channel_id).first()
         
         if not channel:
             raise HTTPException(
@@ -56,22 +56,22 @@ class MessageChannelService:
             db: Database session
             
         Returns:
-            MessageChannel: The created message channel
+            CommunicationChannel: The created message channel
         """
         try:
-            # Check if channel with same shortname already exists
-            existing_channel = db.query(MessageChannel).filter(
-                MessageChannel.shortname == channel_data['shortname']
+            # Check if channel with same code already exists
+            existing_channel = db.query(CommunicationChannel).filter(
+                CommunicationChannel.code == channel_data['code']
             ).first()
             
             if existing_channel:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Message channel with shortname '{channel_data['shortname']}' already exists"
+                    detail=f"Message channel with code '{channel_data['code']}' already exists"
                 )
             
             # Create message channel
-            channel = MessageChannel(**channel_data)
+            channel = CommunicationChannel(**channel_data)
             
             db.add(channel)
             db.commit()
@@ -104,10 +104,10 @@ class MessageChannelService:
             db: Database session
             
         Returns:
-            MessageChannel: The updated message channel
+            CommunicationChannel: The updated message channel
         """
         try:
-            channel = db.query(MessageChannel).filter(MessageChannel.id == channel_id).first()
+            channel = db.query(CommunicationChannel).filter(CommunicationChannel.id == channel_id).first()
             
             if not channel:
                 raise HTTPException(
@@ -115,17 +115,17 @@ class MessageChannelService:
                     detail="Message channel not found"
                 )
             
-            # Check for unique constraint if shortname is being updated
-            if 'shortname' in update_data and update_data['shortname'] != channel.shortname:
-                existing_channel = db.query(MessageChannel).filter(
-                    MessageChannel.shortname == update_data['shortname'],
-                    MessageChannel.id != channel_id
+            # Check for unique constraint if code is being updated
+            if 'code' in update_data and update_data['code'] != channel.code:
+                existing_channel = db.query(CommunicationChannel).filter(
+                    CommunicationChannel.code == update_data['code'],
+                    CommunicationChannel.id != channel_id
                 ).first()
                 
                 if existing_channel:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Message channel with shortname '{update_data['shortname']}' already exists"
+                        detail=f"Message channel with code '{update_data['code']}' already exists"
                     )
             
             # Update fields
@@ -161,7 +161,7 @@ class MessageChannelService:
             bool: True if successful
         """
         try:
-            channel = db.query(MessageChannel).filter(MessageChannel.id == channel_id).first()
+            channel = db.query(CommunicationChannel).filter(CommunicationChannel.id == channel_id).first()
             
             if not channel:
                 raise HTTPException(
