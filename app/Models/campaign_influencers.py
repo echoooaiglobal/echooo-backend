@@ -17,7 +17,7 @@ class CampaignInfluencer(Base):
     total_contact_attempts = Column(Integer, nullable=False, default=0)
     collaboration_price = Column(Numeric(10, 2), nullable=True)
     currency = Column(String(3), nullable=True, default='USD')  # NEW: ISO currency code
-    is_ready_for_onboarding = Column(Boolean, nullable=False, default=False)
+    # is_ready_for_onboarding = Column(Boolean, nullable=False, default=False)
     onboarded_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
