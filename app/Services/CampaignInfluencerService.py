@@ -606,7 +606,156 @@ class CampaignInfluencerService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error copying influencers between lists"
             ) from e
+
+    @staticmethod
+    async def mark_influencers_onboarded(
+        campaign_list_id: str,
+        influencer_ids: List[str],
+        db: Session
+    ) -> None:
+        """
+        Mark multiple campaign influencers as onboarded with current timestamp
         
+        Args:
+            campaign_list_id: Campaign list ID
+            influencer_ids: List of influencer IDs to mark as onboarded
+            db: Database session
+            
+        Raises:
+            HTTPException: If validation fails or database error occurs
+        """
+        try:
+            from datetime import datetime
+            
+            campaign_list_uuid = uuid.UUID(campaign_list_id)
+            influencer_uuids = [uuid.UUID(id_str) for id_str in influencer_ids]
+            
+            # Verify campaign list exists
+            campaign_list = db.query(CampaignList).filter(
+                CampaignList.id == campaign_list_uuid
+            ).first()
+            
+            if not campaign_list:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Campaign list not found"
+                )
+            
+            # Get target influencers
+            target_influencers = db.query(CampaignInfluencer).filter(
+                CampaignInfluencer.id.in_(influencer_uuids),
+                CampaignInfluencer.campaign_list_id == campaign_list_uuid
+            ).all()
+            
+            # Validate all requested influencers exist
+            found_ids = {inf.id for inf in target_influencers}
+            missing_ids = set(influencer_uuids) - found_ids
+            
+            if missing_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Campaign influencers not found in this list: {[str(id) for id in missing_ids]}"
+                )
+            
+            # Get current timestamp and update all influencers
+            current_timestamp = datetime.utcnow()
+            
+            for influencer in target_influencers:
+                influencer.onboarded_at = current_timestamp
+            
+            # Commit all changes
+            db.commit()
+            logger.info(f"Successfully marked {len(target_influencers)} influencers as onboarded in campaign list {campaign_list_id}")
+            
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Database error in mark_influencers_onboarded: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error marking influencers as onboarded"
+            ) from e
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error in mark_influencers_onboarded: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error marking influencers as onboarded"
+            ) from e
+
+    @staticmethod
+    async def remove_influencers_onboarded_status(
+        campaign_list_id: str,
+        influencer_ids: List[str],
+        db: Session
+    ) -> None:
+        """
+        Remove onboarded status from multiple campaign influencers
+        
+        Args:
+            campaign_list_id: Campaign list ID
+            influencer_ids: List of influencer IDs to remove onboarded status from
+            db: Database session
+            
+        Raises:
+            HTTPException: If validation fails or database error occurs
+        """
+        try:
+            campaign_list_uuid = uuid.UUID(campaign_list_id)
+            influencer_uuids = [uuid.UUID(id_str) for id_str in influencer_ids]
+            
+            # Verify campaign list exists
+            campaign_list = db.query(CampaignList).filter(
+                CampaignList.id == campaign_list_uuid
+            ).first()
+            
+            if not campaign_list:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Campaign list not found"
+                )
+            
+            # Get target influencers
+            target_influencers = db.query(CampaignInfluencer).filter(
+                CampaignInfluencer.id.in_(influencer_uuids),
+                CampaignInfluencer.campaign_list_id == campaign_list_uuid
+            ).all()
+            
+            # Validate all requested influencers exist
+            found_ids = {inf.id for inf in target_influencers}
+            missing_ids = set(influencer_uuids) - found_ids
+            
+            if missing_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Campaign influencers not found in this list: {[str(id) for id in missing_ids]}"
+                )
+            
+            # Clear onboarded_at timestamp for all influencers
+            for influencer in target_influencers:
+                influencer.onboarded_at = None
+            
+            # Commit all changes
+            db.commit()
+            logger.info(f"Successfully removed onboarded status from {len(target_influencers)} influencers in campaign list {campaign_list_id}")
+            
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Database error in remove_influencers_onboarded_status: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error removing onboarded status"
+            ) from e
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error in remove_influencers_onboarded_status: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error removing onboarded status from influencers"
+            ) from e  
 
     # @staticmethod
     # async def get_contact_history_via_assignments(

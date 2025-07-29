@@ -216,3 +216,45 @@ class UpdateSuccessResponse(BaseModel):
     success: bool = True
     message: str
     influencer_id: str
+
+class OnboardingRequest(BaseModel):
+    """Schema for marking influencers as onboarded"""
+    campaign_list_id: str = Field(..., description="Campaign list ID")
+    influencer_ids: List[str] = Field(..., description="Array of influencer IDs to mark as onboarded")
+    
+    @field_validator('campaign_list_id', mode='before')
+    @classmethod
+    def convert_campaign_list_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
+    @field_validator('influencer_ids', mode='before')
+    @classmethod
+    def convert_influencer_uuids_to_str(cls, v):
+        if isinstance(v, list):
+            return [str(item) if isinstance(item, uuid.UUID) else item for item in v]
+        return v
+
+class OnboardingRemovalRequest(BaseModel):
+    """Schema for removing onboarded status from influencers"""
+    campaign_list_id: str = Field(..., description="Campaign list ID")
+    influencer_ids: List[str] = Field(..., description="Array of influencer IDs to remove onboarded status from")
+    
+    @field_validator('campaign_list_id', mode='before')
+    @classmethod
+    def convert_campaign_list_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
+    @field_validator('influencer_ids', mode='before')
+    @classmethod
+    def convert_influencer_uuids_to_str(cls, v):
+        if isinstance(v, list):
+            return [str(item) if isinstance(item, uuid.UUID) else item for item in v]
+        return v
+
+class OnboardingOperationResponse(BaseModel):
+    """Simple response schema for onboarding operations"""
+    message: str = Field(..., description="Success or error message")

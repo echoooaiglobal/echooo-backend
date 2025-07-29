@@ -13,6 +13,9 @@ from app.Schemas.campaign_influencer import (
     CampaignInfluencerStatusUpdate,
     CampaignInfluencerNotesUpdate,
     UpdateSuccessResponse,
+    OnboardingRequest,
+    OnboardingRemovalRequest,
+    OnboardingOperationResponse
 )
 
 from app.Utils.Helpers import (
@@ -25,7 +28,7 @@ router = APIRouter(prefix="/campaign-influencers", tags=["Campaign Influencers"]
 @router.get("/", response_model=CampaignInfluencersPaginatedResponse)
 async def get_all_campaign_influencers(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(10, ge=1, le=1000, description="Items per page"),
     campaign_list_id: Optional[uuid.UUID] = Query(None, description="Filter by campaign list ID"),
     current_user: User = Depends(has_permission("campaign:read")),
     db: Session = Depends(get_db)
@@ -462,4 +465,81 @@ async def update_influencer_notes(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating notes: {str(e)}"
+        )
+    
+
+@router.patch("/mark-onboarded", response_model=OnboardingOperationResponse)
+async def mark_onboarded(
+    request_data: OnboardingRequest,
+    current_user: User = Depends(has_permission("campaign_influencer:update")),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark campaign influencers as onboarded with current timestamp
+    
+    Args:
+        request_data: Contains campaign_list_id and influencer_ids array
+        
+    Returns:
+        Success or error message with appropriate status code
+        
+    Example:
+    {
+        "campaign_list_id": "uuid",
+        "influencer_ids": ["uuid1", "uuid2", "uuid3"]
+    }
+    """
+    try:
+        message = await CampaignInfluencerController.mark_onboarded(
+            request_data.campaign_list_id, 
+            request_data.influencer_ids, 
+            db
+        )
+        
+        return OnboardingOperationResponse(message=message)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error marking influencers as onboarded: {str(e)}"
+        )
+
+@router.patch("/remove-onboarded", response_model=OnboardingOperationResponse)
+async def remove_onboarded(
+    request_data: OnboardingRemovalRequest,
+    current_user: User = Depends(has_permission("campaign_influencer:update")),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove onboarded status from campaign influencers
+    
+    Args:
+        request_data: Contains campaign_list_id and influencer_ids array
+        
+    Returns:
+        Success or error message with appropriate status code
+        
+    Example:
+    {
+        "campaign_list_id": "uuid",
+        "influencer_ids": ["uuid1", "uuid2", "uuid3"]
+    }
+    """
+    try:
+        message = await CampaignInfluencerController.remove_onboarded(
+            request_data.campaign_list_id,
+            request_data.influencer_ids,
+            db
+        )
+        
+        return OnboardingOperationResponse(message=message)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error removing onboarded status: {str(e)}"
         )

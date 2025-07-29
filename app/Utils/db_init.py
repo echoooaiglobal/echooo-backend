@@ -250,7 +250,8 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name.like("payment:%")) |
                 (Permission.name.like("analytics:%")) |
                 (Permission.name.like("user:read")) |
-                (Permission.name.like("user:update"))
+                (Permission.name.like("user:update")) |
+                (Permission.name.like("campaign_influencer:%"))
             ).all()
             assign_permissions_to_role(b2c_company_owner, owner_permissions)
             logger.info("Assigned owner permissions to b2c_company_owner")
@@ -264,7 +265,8 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name.like("influencer_contact:%")) |
                 (Permission.name.like("user:read")) |
                 (Permission.name.like("user:update")) |
-                (Permission.name.like("analytics:%"))
+                (Permission.name.like("analytics:%")) |
+                (Permission.name.like("campaign_influencer:%"))
             ).all()
             assign_permissions_to_role(b2c_company_admin, admin_permissions)
             logger.info("Assigned admin permissions to b2c_company_admin")
@@ -290,7 +292,8 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name.like("influencer:%")) |
                 (Permission.name.like("influencer_contact:%")) |
                 (Permission.name.like("content:%")) |
-                (Permission.name.like("analytics:read"))
+                (Permission.name.like("analytics:read")) |
+                (Permission.name.like("campaign_influencer:%"))
             ).all()
             assign_permissions_to_role(b2c_campaign_manager, campaign_mgr_permissions)
             logger.info("Assigned campaign manager permissions to b2c_campaign_manager")

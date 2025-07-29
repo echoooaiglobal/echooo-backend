@@ -827,3 +827,71 @@ class CampaignInfluencerController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error getting currency statistics"
             ) from e
+        
+    @staticmethod
+    async def mark_onboarded(
+        campaign_list_id: str,
+        influencer_ids: List[str],
+        db: Session
+    ) -> str:
+        """
+        Mark campaign influencers as onboarded with current timestamp
+        
+        Args:
+            campaign_list_id: Campaign list ID
+            influencer_ids: List of influencer IDs to mark as onboarded
+            db: Database session
+            
+        Returns:
+            Success message string
+        """
+        try:
+            await CampaignInfluencerService.mark_influencers_onboarded(
+                campaign_list_id, influencer_ids, db
+            )
+            
+            count = len(influencer_ids)
+            return f"Successfully marked {count} influencer{'s' if count != 1 else ''} as onboarded"
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in mark_onboarded controller: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error marking influencers as onboarded"
+            ) from e
+
+    @staticmethod
+    async def remove_onboarded(
+        campaign_list_id: str,
+        influencer_ids: List[str],
+        db: Session
+    ) -> str:
+        """
+        Remove onboarded status from campaign influencers
+        
+        Args:
+            campaign_list_id: Campaign list ID
+            influencer_ids: List of influencer IDs to remove onboarded status from
+            db: Database session
+            
+        Returns:
+            Success message string
+        """
+        try:
+            await CampaignInfluencerService.remove_influencers_onboarded_status(
+                campaign_list_id, influencer_ids, db
+            )
+            
+            count = len(influencer_ids)
+            return f"Successfully removed {count} onboarded influencer{'s' if count != 1 else ''}"
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error in remove_onboarded controller: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error removing onboarded status from influencers"
+            ) from e
