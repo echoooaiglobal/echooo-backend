@@ -230,7 +230,7 @@ class CampaignInfluencerService:
                 "social_account_id": social_account_id,
                 "status_id": default_status.id,
                 "total_contact_attempts": 0,
-                "is_ready_for_onboarding": False,
+                # "is_ready_for_onboarding": False,
                 "notes": social_data.get('notes', None)
             }
             
@@ -576,7 +576,7 @@ class CampaignInfluencerService:
                         status_id=source_influencer.status_id,
                         total_contact_attempts=0,  # Reset contact attempts
                         collaboration_price=source_influencer.collaboration_price,
-                        is_ready_for_onboarding=False,  # Reset onboarding
+                        # is_ready_for_onboarding=False,  # Reset onboarding
                         notes=source_influencer.notes
                     )
                     

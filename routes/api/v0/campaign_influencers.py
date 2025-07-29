@@ -29,16 +29,16 @@ router = APIRouter(prefix="/campaign-influencers", tags=["Campaign Influencers"]
 async def get_all_campaign_influencers(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=1000, description="Items per page"),
-    campaign_list_id: Optional[uuid.UUID] = Query(None, description="Filter by campaign list ID"),
+    list_id: Optional[uuid.UUID] = Query(None, description="Filter by campaign list ID"),
     current_user: User = Depends(has_permission("campaign:read")),
     db: Session = Depends(get_db)
 ):
     """
-    Get paginated campaign influencers, optionally filtered by campaign_list_id
+    Get paginated campaign influencers, optionally filtered by list_id
     """
-    if campaign_list_id:
+    if list_id:
         return await CampaignInfluencerController.get_list_influencers_paginated(
-            campaign_list_id, page, page_size, db
+            list_id, page, page_size, db
         )
     return await CampaignInfluencerController.get_all_influencers_paginated(page, page_size, db)
 

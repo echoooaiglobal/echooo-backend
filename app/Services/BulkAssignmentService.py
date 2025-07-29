@@ -250,8 +250,6 @@ class BulkAssignmentService:
                         AssignedInfluencer.type == 'active'
                     ).count()
                     
-                    agent_assignment.assigned_influencers_count = actual_total_count
-                    
                     if existing_assignment:
                         logger.info(f"Updated existing assignment {agent_assignment.id} count to {actual_total_count}")
                     else:
@@ -385,13 +383,6 @@ class BulkAssignmentService:
                 db
             )
             
-            await BulkAssignmentService._update_assignment_counters(
-                current_agent_assignment.id, db
-            )
-            await BulkAssignmentService._update_assignment_counters(
-                new_assignment.agent_assignment_id, db
-            )
-            
             db.commit()
             
             return {
@@ -505,7 +496,9 @@ class BulkAssignmentService:
             ).count()
             
             # Total count for debugging (all types)
-            total_count_in_assignment = existing_assignment_for_list.assigned_influencers_count
+            total_count_in_assignment = db.query(AssignedInfluencer).filter(
+                AssignedInfluencer.agent_assignment_id == existing_assignment_for_list.id
+            ).count()
             
             logger.info(f"Agent {agent_id} assignment: active={active_count_in_assignment}, total={total_count_in_assignment}, limit={max_per_assignment}")
             
@@ -536,7 +529,6 @@ class BulkAssignmentService:
             "max_per_assignment": max_per_assignment,
             "available_capacity": max(0, available_capacity),
             "existing_assignments_for_list": existing_assignments_for_list,
-            "existing_assignment_count": existing_assignment_for_list.assigned_influencers_count if existing_assignment_for_list else 0,
             "can_accept_new": available_capacity > 0,
             "assignment_status": assignment_status
         }
@@ -966,80 +958,6 @@ class BulkAssignmentService:
                 
         except Exception as e:
             logger.error(f"Error in _update_all_agent_counters: {str(e)}")
-    
-    @staticmethod
-    async def _update_assignment_counters(
-        agent_assignment_id: uuid.UUID,
-        db: Session
-    ) -> None:
-        """Update assignment and agent counters with correct separate logic"""
-        
-        assignment = db.query(AgentAssignment).filter(
-            AgentAssignment.id == agent_assignment_id
-        ).first()
-        
-        if assignment:
-            # ASSIGNMENT COUNTER: Count ALL types (active + completed + archived)
-            total_count = db.query(AssignedInfluencer).filter(
-                AssignedInfluencer.agent_assignment_id == agent_assignment_id
-            ).count()
-            
-            # Separate counts for debugging
-            active_count = db.query(AssignedInfluencer).filter(
-                AssignedInfluencer.agent_assignment_id == agent_assignment_id,
-                AssignedInfluencer.type == 'active'
-            ).count()
-            
-            completed_count = db.query(AssignedInfluencer).filter(
-                AssignedInfluencer.agent_assignment_id == agent_assignment_id,
-                AssignedInfluencer.type == 'completed'
-            ).count()
-            
-            archived_count = db.query(AssignedInfluencer).filter(
-                AssignedInfluencer.agent_assignment_id == agent_assignment_id,
-                AssignedInfluencer.type == 'archived'
-            ).count()
-            
-            old_assignment_count = assignment.assigned_influencers_count
-            assignment.assigned_influencers_count = total_count  # ALL types
-            
-            # Update optional detailed counts if columns exist
-            if hasattr(assignment, 'completed_influencers_count'):
-                assignment.completed_influencers_count = completed_count
-            if hasattr(assignment, 'pending_influencers_count'):
-                assignment.pending_influencers_count = active_count
-            
-            logger.info(f"Updated assignment {agent_assignment_id} total count: {old_assignment_count}→{total_count} (active: {active_count}, completed: {completed_count}, archived: {archived_count})")
-            
-            # AGENT COUNTER: Count ONLY 'active' types across ALL assignments
-            agent = db.query(OutreachAgent).filter(
-                OutreachAgent.id == assignment.outreach_agent_id
-            ).first()
-            
-            if agent:
-                # Calculate total ACTIVE influencers across all assignments for this agent
-                total_active_influencers = db.query(func.count(AssignedInfluencer.id)).join(
-                    AgentAssignment, AssignedInfluencer.agent_assignment_id == AgentAssignment.id
-                ).filter(
-                    AgentAssignment.outreach_agent_id == agent.id,
-                    AgentAssignment.is_deleted == False,
-                    AssignedInfluencer.type == 'active'  # ONLY active types
-                ).scalar() or 0
-                
-                # Calculate number of active campaign lists (assignments with influencers)
-                total_lists = db.query(func.count(AgentAssignment.id.distinct())).filter(
-                    AgentAssignment.outreach_agent_id == agent.id,
-                    AgentAssignment.is_deleted == False,
-                    AgentAssignment.assigned_influencers_count > 0
-                ).scalar() or 0
-                
-                old_agent_count = agent.active_influencers_count
-                old_lists = agent.active_lists_count
-                
-                agent.active_influencers_count = total_active_influencers  # ONLY active
-                agent.active_lists_count = total_lists
-                
-                logger.info(f"Updated agent {agent.id} counters: active_influencers {old_agent_count}→{total_active_influencers}, lists {old_lists}→{total_lists}")
     
     @staticmethod
     async def _get_setting_value(

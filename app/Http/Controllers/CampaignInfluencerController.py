@@ -14,6 +14,8 @@ from app.Models.assigned_influencers import AssignedInfluencer
 from app.Models.influencer_outreach import InfluencerOutreach
 from app.Services.CampaignInfluencerService import CampaignInfluencerService
 from app.Utils.Logger import logger
+from app.Services.BulkAssignmentService import BulkAssignmentService
+from app.Models.agent_assignments import AgentAssignment
 
 class CampaignInfluencerController:
     """Controller for campaign influencer-related endpoints"""
@@ -164,17 +166,16 @@ class CampaignInfluencerController:
         influencer_data: Dict[str, Any],
         db: Session
     ):
-        """Add an influencer to a campaign list"""
+        """Add an influencer to a campaign list with automatic agent assignment"""
         try:
-            
             # Convert to dict if it's a Pydantic model
             data_dict = influencer_data if isinstance(influencer_data, dict) else influencer_data.model_dump(exclude_unset=True)
 
-            # print(f"Adding influencer with data: {data_dict}")
             # Ensure campaign_list_id from path is used
             data_dict['campaign_list_id'] = str(campaign_list_id)
             
-            # Process the request based on whether social_data or social_account_id is provided
+            # Step 1: Add influencer to campaign_influencer table (existing logic)
+            influencer = None
             if 'social_data' in data_dict and data_dict['social_data']:
                 # Handle with social data (for bulk creation)
                 platform_id = data_dict.get('platform_id')
@@ -202,7 +203,46 @@ class CampaignInfluencerController:
                 # Call the original method
                 influencer = await CampaignInfluencerService.add_influencer(data_dict, db)
             
+            # Step 2: Check if campaign list has existing agent assignments
+            existing_assignments = db.query(AgentAssignment).filter(
+                AgentAssignment.campaign_list_id == campaign_list_id,
+                AgentAssignment.is_deleted == False
+            ).first()
+            
+            # Step 3: If campaign list has assignments, auto-assign the new influencer
+            if existing_assignments:
+                try:
+                    logger.info(f"Campaign list {campaign_list_id} has existing assignments. Auto-assigning new influencer {influencer.id}")
+                    
+                    # Use the existing BulkAssignmentService to assign this single influencer
+                    assignment_result = await BulkAssignmentService.execute_bulk_assignment(
+                        campaign_list_id=campaign_list_id,
+                        strategy="load_balanced",  # Use load_balanced for better distribution
+                        preferred_agent_ids=None,  # Let it find the best available agent
+                        max_influencers_per_agent=None,  # Use default limits
+                        force_new_assignments=False,  # Allow using existing assignments
+                        db=db
+                    )
+                    
+                    # Log the assignment result
+                    if assignment_result.get("agent_assignments"):
+                        assigned_count = sum([
+                            assignment["assigned_influencers_count"] 
+                            for assignment in assignment_result["agent_assignments"]
+                        ])
+                        logger.info(f"Successfully auto-assigned {assigned_count} influencer(s) to agents")
+                    else:
+                        logger.warning(f"No agents were available to assign the new influencer {influencer.id}")
+                        
+                except Exception as assignment_error:
+                    # Log the error but don't fail the entire operation
+                    logger.error(f"Failed to auto-assign influencer {influencer.id}: {str(assignment_error)}")
+                    # The influencer was still added to the campaign list successfully
+            else:
+                logger.info(f"Campaign list {campaign_list_id} has no existing assignments. Skipping auto-assignment.")
+            
             return CampaignInfluencerController._format_influencer_response(influencer)
+            
         except Exception as e:
             logger.error(f"Error in add_influencer controller: {str(e)}")
             raise
@@ -214,11 +254,14 @@ class CampaignInfluencerController:
         influencers_data: List[Dict[str, Any]],
         db: Session
     ):
-        """Add multiple influencers to a campaign list in bulk"""
+        """Add multiple influencers to a campaign list in bulk with automatic agent assignment"""
         try:
             result_influencers = []
+            successfully_added_count = 0
             
-            # Begin transaction for all operations
+            # Step 1: Add all influencers to campaign_influencer table (existing logic)
+            logger.info(f"Adding {len(influencers_data)} influencers to campaign list {campaign_list_id}")
+            
             for influencer_data in influencers_data:
                 try:
                     influencer = await CampaignInfluencerService.add_influencer_with_social_data(
@@ -230,12 +273,65 @@ class CampaignInfluencerController:
                     result_influencers.append(
                         CampaignInfluencerController._format_influencer_response(influencer)
                     )
+                    successfully_added_count += 1
                 except Exception as e:
                     # Log the error for this specific influencer but continue with others
                     logger.error(f"Error adding influencer {influencer_data.get('username', 'unknown')}: {str(e)}")
                     # Don't raise here to allow other influencers to be processed
             
+            logger.info(f"Successfully added {successfully_added_count} out of {len(influencers_data)} influencers")
+            
+            # Step 2: Check if campaign list has existing agent assignments
+            if successfully_added_count > 0:  # Only proceed if we added at least one influencer
+                existing_assignments = db.query(AgentAssignment).filter(
+                    AgentAssignment.campaign_list_id == campaign_list_id,
+                    AgentAssignment.is_deleted == False
+                ).first()
+                
+                # Step 3: If campaign list has assignments, auto-assign all new influencers
+                if existing_assignments:
+                    try:
+                        logger.info(f"Campaign list {campaign_list_id} has existing assignments. Auto-assigning {successfully_added_count} new influencers")
+                        
+                        # Use the existing BulkAssignmentService to assign all newly added influencers
+                        assignment_result = await BulkAssignmentService.execute_bulk_assignment(
+                            campaign_list_id=campaign_list_id,
+                            strategy="load_balanced",  # Use load_balanced for better distribution
+                            preferred_agent_ids=None,  # Let it find the best available agents
+                            max_influencers_per_agent=None,  # Use default limits
+                            force_new_assignments=False,  # Allow using existing assignments
+                            db=db
+                        )
+                        
+                        # Log the assignment result
+                        if assignment_result.get("agent_assignments"):
+                            total_assigned = sum([
+                                assignment["assigned_influencers_count"] 
+                                for assignment in assignment_result["agent_assignments"]
+                            ])
+                            unassigned_count = len(assignment_result.get("unassigned_influencers", []))
+                            
+                            logger.info(f"Auto-assignment completed: {total_assigned} assigned, {unassigned_count} unassigned")
+                            
+                            if assignment_result.get("warnings"):
+                                for warning in assignment_result["warnings"]:
+                                    logger.warning(f"Assignment warning: {warning}")
+                                    
+                            if assignment_result.get("errors"):
+                                for error in assignment_result["errors"]:
+                                    logger.error(f"Assignment error: {error}")
+                        else:
+                            logger.warning(f"No agents were available to assign the {successfully_added_count} new influencers")
+                            
+                    except Exception as assignment_error:
+                        # Log the error but don't fail the entire operation
+                        logger.error(f"Failed to auto-assign {successfully_added_count} influencers: {str(assignment_error)}")
+                        # The influencers were still added to the campaign list successfully
+                else:
+                    logger.info(f"Campaign list {campaign_list_id} has no existing assignments. Skipping auto-assignment for {successfully_added_count} influencers.")
+            
             return result_influencers
+            
         except Exception as e:
             logger.error(f"Error in add_bulk_influencers controller: {str(e)}")
             raise

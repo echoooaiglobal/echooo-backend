@@ -76,12 +76,12 @@ async def execute_bulk_assignment(
     
     # Additional counter validation after bulk assignment (optional)
     # This ensures counters are accurate after the operation
-    validation_result = await CounterSyncService.validate_counter_integrity(db)
-    
-    if not validation_result["is_valid"]:
-        logger.warning(f"Counter discrepancies found after bulk assignment: {validation_result['discrepancies_found']}")
-        # Auto-fix if needed
+    try:
         await CounterSyncService.sync_all_agent_counters(db)
+        logger.info("Agent counters synced after bulk assignment")
+    except Exception as sync_error:
+        logger.warning(f"Counter sync failed: {str(sync_error)}")
+
     
     return result
 
@@ -168,11 +168,10 @@ async def get_assignment_progress(
     - Progress percentage and completion estimates
     """
     try:
-        # This would use existing services to get progress info
-        from app.Services.BulkAssignmentService import BulkAssignmentService
         from app.Models.campaign_lists import CampaignList
         from app.Models.campaign_influencers import CampaignInfluencer
         from app.Models.agent_assignments import AgentAssignment
+        from app.Models.assigned_influencers import AssignedInfluencer
         from sqlalchemy import func, and_
         
         # Get campaign list
@@ -207,6 +206,33 @@ async def get_assignment_progress(
         # Calculate progress
         progress_percentage = (assigned_influencers / total_influencers * 100) if total_influencers > 0 else 0
         
+        # Build agent assignment data with runtime calculations
+        agent_assignment_data = []
+        for assignment in agent_assignments:
+            # Calculate counts at runtime
+            assigned_count = db.query(AssignedInfluencer).filter(
+                AssignedInfluencer.agent_assignment_id == assignment.id
+            ).count()
+            
+            completed_count = db.query(AssignedInfluencer).filter(
+                AssignedInfluencer.agent_assignment_id == assignment.id,
+                AssignedInfluencer.type == 'completed'
+            ).count()
+            
+            pending_count = db.query(AssignedInfluencer).filter(
+                AssignedInfluencer.agent_assignment_id == assignment.id,
+                AssignedInfluencer.type == 'active'
+            ).count()
+            
+            agent_assignment_data.append({
+                "id": str(assignment.id),
+                "agent_id": str(assignment.outreach_agent_id),
+                "assigned_influencers_count": assigned_count,
+                "completed_influencers_count": completed_count,
+                "pending_influencers_count": pending_count,
+                "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None
+            })
+        
         return {
             "campaign_list_id": str(campaign_list_id),
             "campaign_list_name": getattr(campaign_list, 'name', None),
@@ -216,20 +242,11 @@ async def get_assignment_progress(
                 "unassigned_influencers": unassigned_influencers,
                 "progress_percentage": round(progress_percentage, 2)
             },
-            "agent_assignments": [
-                {
-                    "id": str(assignment.id),
-                    "agent_id": str(assignment.outreach_agent_id),
-                    "assigned_influencers_count": assignment.assigned_influencers_count,
-                    "completed_influencers_count": assignment.completed_influencers_count,
-                    "pending_influencers_count": assignment.pending_influencers_count,
-                    "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None
-                }
-                for assignment in agent_assignments
-            ]
+            "agent_assignments": agent_assignment_data
         }
         
     except Exception as e:
+        logger.error(f"Error getting assignment progress: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting assignment progress: {str(e)}"
