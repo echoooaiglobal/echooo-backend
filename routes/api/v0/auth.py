@@ -1,7 +1,8 @@
 # routes/api/v0/auth.py - FIXED with complete-company-registration endpoint
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.Http.Controllers.AuthController import AuthController
 from app.Models.auth_models import User
@@ -81,14 +82,48 @@ async def get_me(current_user: User = Depends(get_current_active_user), db: Sess
     """Get current user profile with additional details"""
     return await AuthController.get_me(current_user, db)
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserDetailResponse)
 async def update_profile(
-    user_data: UserUpdate,
+    # Support both JSON and form data for flexibility
+    first_name: Optional[str] = Form(None, max_length=100),
+    last_name: Optional[str] = Form(None, max_length=100),
+    full_name: Optional[str] = Form(None, max_length=255),
+    phone_number: Optional[str] = Form(None, max_length=20),
+    profile_image: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Update current user's profile"""
-    return await AuthController.update_profile(user_data, current_user, db)
+    """
+    Update current user's profile including optional image upload
+    
+    Supports:
+    - Individual name fields (first_name, last_name)
+    - Full name (for backward compatibility)
+    - Phone number
+    - Profile image upload (optional)
+    
+    Can update any combination of fields in a single request.
+    """
+    updated_user = await AuthController.update_profile(
+        db=db,
+        current_user=current_user,
+        first_name=first_name,
+        last_name=last_name,
+        full_name=full_name,
+        phone_number=phone_number,
+        profile_image=profile_image
+    )
+    
+    return UserDetailResponse.from_orm(updated_user)
+
+@router.delete("/me/profile-image")
+async def delete_current_user_profile_image(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Delete current user's profile image"""
+    return await AuthController.delete_profile_image(db=db, current_user=current_user)
+
 
 @router.post("/verify-email", response_model=EmailVerificationResponse)
 async def verify_email(

@@ -2,9 +2,10 @@
 import uuid
 import enum
 from datetime import datetime, timedelta
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime, func, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime, func, Index, event
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from app.Models.base import Base
 
@@ -35,9 +36,14 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=True)  # Made nullable for OAuth users
-    full_name = Column(String(255), nullable=False)
+    
+    # Name fields - NEW ADDITION
+    first_name = Column(String(100), nullable=True, index=True)
+    last_name = Column(String(100), nullable=True, index=True)
+    full_name = Column(String(255), nullable=False)  # Keep existing constraint
+    
     phone_number = Column(String(20), nullable=True)
-    profile_image_url = Column(String(255), nullable=True)
+    profile_image_url = Column(String(500), nullable=True)  # Increased length for GCS URLs
     status = Column(String(20), default=UserStatus.PENDING.value, index=True)  # Added index
     user_type = Column(String(20), nullable=True, index=True)  # Added index
     email_verified = Column(Boolean, default=False, index=True)  # Added index
@@ -71,6 +77,33 @@ class User(Base):
     # Relationships for tokens/actions this user revoked (optional, for audit purposes)
     revoked_refresh_tokens = relationship("RefreshToken", foreign_keys="RefreshToken.revoked_by", overlaps="revoker")
     deleted_users = relationship("User", foreign_keys=[deleted_by], overlaps="deleter")
+    
+    
+    # Hybrid property for computed full name
+    @hybrid_property
+    def computed_full_name(self):
+        """Compute full name from first and last name"""
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        elif self.first_name:
+            return self.first_name
+        elif self.last_name:
+            return self.last_name
+        else:
+            return self.full_name or ""
+    
+    @validates('first_name', 'last_name')
+    def validate_names(self, key, value):
+        """Validate name fields"""
+        if value is not None:
+            # Remove extra whitespace and validate length
+            value = value.strip()
+            if len(value) > 100:
+                raise ValueError(f"{key} must be 100 characters or less")
+            if not value.replace(' ', '').replace('-', '').replace("'", '').isalpha():
+                raise ValueError(f"{key} can only contain letters, spaces, hyphens, and apostrophes")
+        return value
+    
     # Additional indexes including soft delete optimizations
     __table_args__ = (
         Index('idx_users_status_type', 'status', 'user_type'),
@@ -79,14 +112,30 @@ class User(Base):
         Index('idx_users_email_deleted', 'email', 'is_deleted'),
         Index('idx_users_status_deleted', 'status', 'is_deleted'),
         Index('idx_users_type_deleted', 'user_type', 'is_deleted'),
-
         Index('idx_users_phone_number', 'phone_number'),  # For phone lookup
         Index('idx_users_last_login', 'last_login_at'),  # For activity tracking
         Index('idx_users_deleted_at', 'deleted_at'),  # For soft delete queries
+        # New indexes for name fields
+        Index('idx_users_first_name', 'first_name'),
+        Index('idx_users_last_name', 'last_name'),
+        Index('idx_users_full_name_search', 'first_name', 'last_name'),
     )
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', user_type='{self.user_type}', status='{self.status}')>"
+
+# Event listener to automatically update full_name when first_name or last_name changes
+@event.listens_for(User.first_name, 'set')
+@event.listens_for(User.last_name, 'set')
+def update_full_name(target, value, oldvalue, initiator):
+    """Automatically update full_name when first_name or last_name changes"""
+    if hasattr(target, 'first_name') and hasattr(target, 'last_name'):
+        if target.first_name and target.last_name:
+            target.full_name = f"{target.first_name} {target.last_name}"
+        elif target.first_name:
+            target.full_name = target.first_name
+        elif target.last_name:
+            target.full_name = target.last_name
 
 class Role(Base):
     __tablename__ = 'roles'

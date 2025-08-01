@@ -1,5 +1,5 @@
 # app/Http/Controllers/AuthController.py
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, UploadFile
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -25,6 +25,8 @@ from app.Utils.Helpers import get_current_user, get_current_active_user
 from app.Utils.Logger import logger
 from config.settings import settings
 from app.Services.CompanyService import CompanyService
+from app.Services.GoogleCloudStorageService import gcs_service
+from app.Utils.Logger import logger
 
 # Configuration for JWT
 SECRET_KEY = settings.SECRET_KEY
@@ -484,23 +486,164 @@ class AuthController:
         return response
     
     @staticmethod
-    async def update_profile(user_data: UserUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-        """Update current user's profile"""
-        # Update allowed fields
-        if user_data.full_name is not None:
-            current_user.full_name = user_data.full_name
-        
-        if user_data.phone_number is not None:
-            current_user.phone_number = user_data.phone_number
+    async def update_profile(
+        db: Session, 
+        current_user,
+        # Form data for profile fields
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        full_name: Optional[str] = None,
+        phone_number: Optional[str] = None,
+        # File upload for profile image
+        profile_image: Optional[UploadFile] = None
+    ):
+        """
+        Update user profile with new fields and optional image upload
+        Supports both individual field updates and image upload in one call
+        """
+        try:
+            # Check if user is soft deleted
+            if current_user.is_deleted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot modify deleted user profile"
+                )
             
-        if user_data.profile_image_url is not None:
-            current_user.profile_image_url = user_data.profile_image_url
-        
-        # Save changes
-        db.commit()
-        db.refresh(current_user)
-        
-        return UserResponse.from_orm(current_user)
+            # Track if any changes were made
+            changes_made = False
+            
+            # Handle profile image upload first (if provided)
+            if profile_image and profile_image.filename:
+                try:
+                    # Upload new image to GCS
+                    file_path, public_url = await gcs_service.upload_profile_image(
+                        file=profile_image,
+                        user_id=str(current_user.id),
+                        optimize=True
+                    )
+                    
+                    # Delete old profile image if exists
+                    if current_user.profile_image_url:
+                        old_file_path = current_user.profile_image_url.split('/')[-2:]
+                        if len(old_file_path) == 2:
+                            old_path = f"profile-images/{old_file_path[0]}/{old_file_path[1]}"
+                            await gcs_service.delete_profile_image(old_path)
+                    
+                    # Update profile image URL
+                    current_user.profile_image_url = public_url
+                    changes_made = True
+                    logger.info(f"Profile image updated for user {current_user.id}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to upload profile image for user {current_user.id}: {str(e)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to upload profile image: {str(e)}"
+                    )
+            
+            # Update name fields
+            if first_name is not None:
+                # Validate and clean first name
+                first_name = first_name.strip()
+                if first_name and not first_name.replace(' ', '').replace('-', '').replace("'", '').isalpha():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="First name can only contain letters, spaces, hyphens, and apostrophes"
+                    )
+                current_user.first_name = first_name or None
+                changes_made = True
+            
+            if last_name is not None:
+                # Validate and clean last name
+                last_name = last_name.strip()
+                if last_name and not last_name.replace(' ', '').replace('-', '').replace("'", '').isalpha():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Last name can only contain letters, spaces, hyphens, and apostrophes"
+                    )
+                current_user.last_name = last_name or None
+                changes_made = True
+            
+            # Auto-update full_name if first_name or last_name changed
+            if first_name is not None or last_name is not None:
+                if current_user.first_name and current_user.last_name:
+                    current_user.full_name = f"{current_user.first_name} {current_user.last_name}"
+                elif current_user.first_name:
+                    current_user.full_name = current_user.first_name
+                elif current_user.last_name:
+                    current_user.full_name = current_user.last_name
+                elif full_name:  # Use provided full_name if individual names are empty
+                    current_user.full_name = full_name.strip()
+                # If all are empty, keep existing full_name (don't make it null due to constraint)
+            
+            # Update full_name directly if provided (backward compatibility)
+            elif full_name is not None:
+                current_user.full_name = full_name.strip()
+                changes_made = True
+            
+            # Update phone number
+            if phone_number is not None:
+                current_user.phone_number = phone_number.strip() or None
+                changes_made = True
+            
+            # Only commit if changes were made
+            if changes_made:
+                db.commit()
+                db.refresh(current_user)
+                logger.info(f"Profile updated for user {current_user.id}")
+            
+            return current_user
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating profile for user {current_user.id}: {str(e)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update profile"
+            )
+    
+    @staticmethod
+    async def delete_profile_image(db: Session, current_user):
+        """Delete user's profile image"""
+        try:
+            # Check if user is soft deleted
+            if current_user.is_deleted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot modify deleted user profile"
+                )
+            
+            if not current_user.profile_image_url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No profile image to delete"
+                )
+            
+            # Extract file path from URL and delete from GCS
+            url_parts = current_user.profile_image_url.split('/')
+            if len(url_parts) >= 2:
+                file_path = f"profile-images/{url_parts[-2]}/{url_parts[-1]}"
+                await gcs_service.delete_profile_image(file_path)
+            
+            # Update database
+            current_user.profile_image_url = None
+            db.commit()
+            db.refresh(current_user)
+            
+            logger.info(f"Profile image deleted for user {current_user.id}")
+            return {"message": "Profile image deleted successfully"}
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to delete profile image for user {current_user.id}: {str(e)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete profile image"
+            )
     
     @staticmethod
     async def verify_email(token_data: EmailVerificationToken, db: Session):

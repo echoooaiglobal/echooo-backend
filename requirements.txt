@@ -22,3 +22,5 @@ APScheduler==3.10.4          # Advanced Python Scheduler
 pytz==2023.3                 # Timezone handling
 asyncio-cron==0.1.2          # Async cron support (optional)
 cryptography>=41.0.0
+google-cloud-storage
+pillow

@@ -1,4 +1,4 @@
-# app/Schemas/auth.py
+# app/Schemas/auth.py - Updated with first_name and last_name fields
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, validator, root_validator
 import uuid
 from typing import List, Optional, Dict
@@ -40,8 +40,20 @@ class RoleResponse(BaseModel):
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: str
+    # Updated to include new name fields
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    full_name: str  # Keep for backward compatibility
     phone_number: Optional[str] = None
+    
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def validate_names(cls, v):
+        if v is not None:
+            v = v.strip()
+            if v and not v.replace(' ', '').replace('-', '').replace("'", '').isalpha():
+                raise ValueError('Name can only contain letters, spaces, hyphens, and apostrophes')
+        return v
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
@@ -52,6 +64,10 @@ class UserCreate(UserBase):
     # Company related fields
     company_name: Optional[str] = None
     company_domain: Optional[str] = None
+    
+    # Override to make first_name and last_name required for user creation
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
     
     @field_validator('password')
     def password_strength(cls, v: str) -> str:
@@ -82,13 +98,28 @@ class UserCreate(UserBase):
         return v
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
+    # Updated to include new name fields
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    full_name: Optional[str] = None  # Keep for backward compatibility
     phone_number: Optional[str] = None
     profile_image_url: Optional[str] = None
+    
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def validate_names(cls, v):
+        if v is not None:
+            v = v.strip()
+            if v and not v.replace(' ', '').replace('-', '').replace("'", '').isalpha():
+                raise ValueError('Name can only contain letters, spaces, hyphens, and apostrophes')
+        return v
 
 class UserResponse(BaseModel):
     id: str
     email: EmailStr
+    # Updated to include new name fields
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     full_name: str
     phone_number: Optional[str] = None
     status: str
@@ -109,6 +140,21 @@ class UserResponse(BaseModel):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
+
+    # Compute full_name if not provided
+    @field_validator('full_name', mode='before')
+    @classmethod
+    def compute_full_name(cls, v, info):
+        if not v and hasattr(info, 'data'):
+            first_name = info.data.get('first_name', '')
+            last_name = info.data.get('last_name', '')
+            if first_name and last_name:
+                return f"{first_name} {last_name}"
+            elif first_name:
+                return first_name
+            elif last_name:
+                return last_name
+        return v or ""
     
 class CompanyBriefResponse(BaseModel):
     id: str
@@ -318,3 +364,9 @@ class AdminUserUpdate(UserUpdate):
     user_type: Optional[str] = Field(None, pattern=r'^(platform|b2c|influencer)$') 
     status: Optional[str] = Field(None, pattern=r'^(active|inactive|pending|suspended)$')
     email_verified: Optional[bool] = None
+
+# Additional schemas for profile image management
+class ProfileImageResponse(BaseModel):
+    message: str
+    profile_image_url: str
+    file_path: str

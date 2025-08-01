@@ -103,6 +103,34 @@ class Settings(BaseSettings):
     # Token encryption key for storing OAuth tokens securely
     # Generate using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     TOKEN_ENCRYPTION_KEY: str = ""
+
+    # Google Cloud Storage Configuration
+    GCS_BUCKET_NAME: str = os.getenv("GCS_BUCKET_NAME", "")
+    GCS_PROJECT_ID: str = os.getenv("GCS_PROJECT_ID", "")
+    GCS_SERVICE_ACCOUNT_PATH: str = os.getenv("GCS_SERVICE_ACCOUNT_PATH", "gcs-service-account.json")
+    GCS_BASE_URL: str = os.getenv("GCS_BASE_URL", "https://storage.googleapis.com")
+    GCS_CDN_URL: Optional[str] = os.getenv("GCS_CDN_URL")
+    
+    # Profile Image Settings
+    PROFILE_IMAGE_MAX_SIZE: int = int(os.getenv("PROFILE_IMAGE_MAX_SIZE", "5242880"))  # 5MB
+    PROFILE_IMAGE_ALLOWED_TYPES: str = os.getenv(
+        "PROFILE_IMAGE_ALLOWED_TYPES", 
+        "image/jpeg,image/jpg,image/png,image/webp"
+    )
+    
+    # File storage settings (existing, update max size)
+    UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "uploads")
+    MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))  # 10MB for other files
+
+    def __post_init__(self):
+        """Validate GCS configuration"""
+        if not self.GCS_BUCKET_NAME or not self.GCS_PROJECT_ID:
+            raise ValueError("GCS_BUCKET_NAME and GCS_PROJECT_ID must be set")
+        
+        if not os.path.exists(self.GCS_SERVICE_ACCOUNT_PATH):
+            # Check if we're in a production environment with IAM roles
+            if not os.getenv("GOOGLE_CLOUD_PROJECT"):
+                raise ValueError(f"GCS service account file not found: {self.GCS_SERVICE_ACCOUNT_PATH}")
     
     # For Pydantic v2
     if PYDANTIC_V2:
