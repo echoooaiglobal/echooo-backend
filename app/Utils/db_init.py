@@ -72,7 +72,7 @@ def assign_permissions_to_roles(db: Session):
     try:
         logger.info("Assigning permissions to roles...")
         
-        # ========== PLATFORM ROLES ==========
+        # Get all roles
         platform_super_admin = db.query(Role).filter(Role.name == "platform_super_admin").first()
         platform_admin = db.query(Role).filter(Role.name == "platform_admin").first()
         platform_manager = db.query(Role).filter(Role.name == "platform_manager").first()
@@ -85,7 +85,7 @@ def assign_permissions_to_roles(db: Session):
         platform_operations_manager = db.query(Role).filter(Role.name == "platform_operations_manager").first()
         platform_agent = db.query(Role).filter(Role.name == "platform_agent").first()
         
-        # ========== B2C COMPANY ROLES ==========
+        # B2C Company roles
         b2c_company_owner = db.query(Role).filter(Role.name == "b2c_company_owner").first()
         b2c_company_admin = db.query(Role).filter(Role.name == "b2c_company_admin").first()
         b2c_marketing_director = db.query(Role).filter(Role.name == "b2c_marketing_director").first()
@@ -99,13 +99,29 @@ def assign_permissions_to_roles(db: Session):
         b2c_account_coordinator = db.query(Role).filter(Role.name == "b2c_account_coordinator").first()
         b2c_viewer = db.query(Role).filter(Role.name == "b2c_viewer").first()
         
-        # ========== INFLUENCER ROLES ==========
+        # Influencer roles
         influencer = db.query(Role).filter(Role.name == "influencer").first()
         influencer_manager = db.query(Role).filter(Role.name == "influencer_manager").first()
-        
+
         # Get all permissions
         all_permissions = db.query(Permission).all()
         
+        # ========== UNIVERSAL PERMISSIONS FOR ALL ROLES ==========
+        universal_permissions = db.query(Permission).filter(
+            (Permission.name == "user:read") |              # Read own profile
+            (Permission.name == "user:update") |            # Update own profile
+            (Permission.name == "oauth:read") |             # Read own OAuth connections
+            (Permission.name == "oauth:update") |           # Update own OAuth connections 
+            (Permission.name == "oauth:delete") |           # Delete own OAuth connections
+            (Permission.name == "oauth:refresh") |          # Refresh own OAuth tokens
+            (Permission.name == "refresh_token:read") |     # Read own refresh tokens
+            (Permission.name == "refresh_token:revoke") |   # Revoke own refresh tokens
+            (Permission.name == "notification:read") |      # Read own notifications
+            (Permission.name == "notification:update") |    # Update notification preferences
+            (Permission.name == "email_verification:read") | # Read own email verification status
+            (Permission.name == "email_verification:resend") # Resend own email verification
+        ).all()
+
         # Helper function to assign permissions to role
         def assign_permissions_to_role(role, permissions):
             if role:
@@ -118,6 +134,27 @@ def assign_permissions_to_roles(db: Session):
                     if not role_perm:
                         role_perm = RolePermission(role_id=role.id, permission_id=perm.id)
                         db.add(role_perm)
+
+        # Helper function to assign universal permissions to all roles
+        def assign_universal_permissions_to_role(role):
+            if role:
+                assign_permissions_to_role(role, universal_permissions)
+                logger.info(f"Assigned universal permissions to {role.name}")
+
+        # ========== ASSIGN UNIVERSAL PERMISSIONS TO ALL ROLES ==========
+        all_roles = [
+            platform_super_admin, platform_admin, platform_manager, platform_developer,
+            platform_customer_support, platform_account_manager, platform_financial_manager,
+            platform_content_moderator, platform_data_analyst, platform_operations_manager,
+            platform_agent, b2c_company_owner, b2c_company_admin, b2c_marketing_director,
+            b2c_campaign_manager, b2c_campaign_executive, b2c_social_media_manager,
+            b2c_content_creator, b2c_brand_manager, b2c_performance_analyst,
+            b2c_finance_manager, b2c_account_coordinator, b2c_viewer,
+            influencer, influencer_manager
+        ]
+        
+        for role in all_roles:
+            assign_universal_permissions_to_role(role)
 
         # ========== PLATFORM ROLE PERMISSIONS ==========
         
@@ -148,7 +185,6 @@ def assign_permissions_to_roles(db: Session):
         if platform_customer_support:
             support_permissions = db.query(Permission).filter(
                 (Permission.name.like("%:read")) |
-                (Permission.name == "user:update") |
                 (Permission.name == "user:verify") |
                 (Permission.name == "user:reset_password") |
                 (Permission.name == "support_ticket:create") |
@@ -222,17 +258,12 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name == "influencer:update") |
                 (Permission.name == "influencer_contact:create") |
                 (Permission.name == "influencer_contact:update") |
-                # NEW: Add assigned_influencer permissions (excluding create and delete)
                 (Permission.name == "assigned_influencer:read") |
                 (Permission.name == "assigned_influencer:update") |
                 (Permission.name == "assigned_influencer:transfer") |
                 (Permission.name == "assigned_influencer:archive") |
                 (Permission.name == "assigned_influencer:bulk_update") |
-                (Permission.name == "influencer_contact:read") |
-                (Permission.name == "influencer_contact:create") |
-                (Permission.name == "influencer_contact:update") |
                 (Permission.name == "campaign_influencer:update")
-
             ).all()
             assign_permissions_to_role(platform_agent, agent_permissions)
             logger.info("Assigned agent permissions to platform_agent")
@@ -249,8 +280,6 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name.like("contract:%")) |
                 (Permission.name.like("payment:%")) |
                 (Permission.name.like("analytics:%")) |
-                (Permission.name.like("user:read")) |
-                (Permission.name.like("user:update")) |
                 (Permission.name.like("campaign_influencer:%"))
             ).all()
             assign_permissions_to_role(b2c_company_owner, owner_permissions)
@@ -263,8 +292,6 @@ def assign_permissions_to_roles(db: Session):
                 (Permission.name.like("campaign:%")) |
                 (Permission.name.like("influencer:%")) |
                 (Permission.name.like("influencer_contact:%")) |
-                (Permission.name.like("user:read")) |
-                (Permission.name.like("user:update")) |
                 (Permission.name.like("analytics:%")) |
                 (Permission.name.like("campaign_influencer:%"))
             ).all()
@@ -392,7 +419,7 @@ def assign_permissions_to_roles(db: Session):
             assign_permissions_to_role(b2c_account_coordinator, coordinator_permissions)
             logger.info("Assigned coordinator permissions to b2c_account_coordinator")
 
-        # B2C Viewer - Read-only access
+        # B2C Viewer - Read-only access + universal permissions
         if b2c_viewer:
             viewer_permissions = db.query(Permission).filter(
                 Permission.name.like("%:read")
@@ -433,7 +460,7 @@ def assign_permissions_to_roles(db: Session):
             logger.info("Assigned influencer manager permissions to influencer_manager role")
         
         db.commit()
-        logger.info("Permissions assigned to roles successfully for Phase 1 (Platform, B2C, Influencer)")
+        logger.info("Permissions assigned to roles successfully for Phase 1 (Platform, B2C, Influencer) with universal permissions")
         
     except Exception as e:
         db.rollback()

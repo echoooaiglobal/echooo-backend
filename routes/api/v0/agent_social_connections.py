@@ -1,5 +1,6 @@
 # routes/api/v0/agent_social_connections.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import uuid
@@ -7,6 +8,7 @@ from datetime import datetime
 
 from app.Http.Controllers.AgentSocialConnectionController import AgentSocialConnectionController
 from app.Models.auth_models import User
+from app.Models.platforms import Platform
 from app.Schemas.agent_social_connection import (
     AgentSocialConnectionCreate, AgentSocialConnectionUpdate,
     AgentSocialConnectionResponse, AgentSocialConnectionDetailResponse,
@@ -15,7 +17,8 @@ from app.Schemas.agent_social_connection import (
     AutomationToggleRequest, AutomationStatusResponse,
     ConnectionHealthCheck, SystemHealthReport,
     BulkConnectionUpdate, BulkOperationResponse,
-    PlatformConnectionRequest
+    PlatformConnectionRequest, PlatformConnectionInitiateRequest,
+    OAuthInitiateResponse, OAuthCallbackResponse
 )
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission
@@ -23,6 +26,61 @@ from app.Utils.Helpers import (
 from config.database import get_db
 
 router = APIRouter(prefix="/agent-social-connections", tags=["Agent Social Connections"])
+
+# =============================================================================
+# OAUTH CONNECTION FLOW
+# =============================================================================
+
+@router.post("/initiate-connection", response_model=OAuthInitiateResponse)
+async def initiate_platform_connection(
+    platform_request: PlatformConnectionInitiateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1: Initiate platform connection (starts OAuth flow)
+    
+    Returns OAuth authorization URL for user to visit.
+    Call this from your frontend when user clicks "Connect Instagram" button.
+    """
+    return await AgentSocialConnectionController.initiate_platform_connection(
+        platform_request, current_user, db
+    )
+
+@router.get("/oauth-callback/{platform}")
+async def handle_oauth_callback(
+    platform: str,
+    code: str = Query(..., description="OAuth authorization code"),
+    state: str = Query(..., description="OAuth state parameter"),
+    error: Optional[str] = Query(None, description="OAuth error if any"),
+    error_description: Optional[str] = Query(None, description="OAuth error description"),
+    db: Session = Depends(get_db)
+):
+    """
+    Step 2: Handle OAuth callback and create connection
+    
+    This endpoint is called by Instagram/Facebook after user authorization.
+    Automatically redirects user back to your frontend with success/error status.
+    """
+    return await AgentSocialConnectionController.handle_oauth_callback(
+        platform, code, state, error, error_description, db
+    )
+
+@router.get("/oauth-status/{platform}")
+async def get_oauth_status(
+    platform: str,
+    state: str = Query(..., description="OAuth state to check status"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check OAuth connection status (for polling from frontend)
+    
+    Use this to check if OAuth flow completed successfully.
+    """
+    return await AgentSocialConnectionController.get_oauth_status(
+        platform, state, current_user, db
+    )
 
 # =============================================================================
 # CORE CRUD OPERATIONS
@@ -118,7 +176,7 @@ async def get_social_connections(
         page, page_size, user_id, platform_id, active_only, search, current_user, db
     )
 
-@router.get("/user/{user_id}/connections", response_model=List[AgentSocialConnectionDetailResponse])
+@router.get("/user/connections", response_model=List[AgentSocialConnectionDetailResponse])
 async def get_user_social_connections(
     user_id: Optional[uuid.UUID] = None,
     platform_id: Optional[uuid.UUID] = Query(None, description="Filter by platform ID"),
@@ -128,12 +186,11 @@ async def get_user_social_connections(
 ):
     """
     Get all social connections for a specific user.
-    
     If no user_id provided, returns current user's connections.
     Admin users can access other users' connections.
     """
     return await AgentSocialConnectionController.get_user_connections(
-        user_id, platform_id, active_only, current_user, db
+        current_user.id, platform_id, active_only, current_user, db
     )
 
 @router.get("/user/{user_id}/platforms/status", response_model=UserPlatformConnectionsStatus)
@@ -153,22 +210,27 @@ async def get_user_platform_status(
     )
 
 # =============================================================================
-# PLATFORM CONNECTION MANAGEMENT
+# PLATFORM CONNECTION MANAGEMENT (Legacy - keep for manual OAuth)
 # =============================================================================
 
 @router.post("/connect", response_model=AgentSocialConnectionDetailResponse)
-async def connect_platform_account(
+async def connect_platform_account_manual(
     platform_request: PlatformConnectionRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Connect a new platform account using OAuth or API credentials.
+    Connect platform account with pre-obtained OAuth code (Legacy method)
     
-    This endpoint handles the connection process for various social media platforms
-    including Instagram, Facebook, WhatsApp, and TikTok. It processes OAuth codes,
-    exchanges them for access tokens, and creates the connection record.
+    Use /initiate-connection instead for better UX.
+    This endpoint is kept for manual OAuth code input if needed.
     """
+    if not platform_request.oauth_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="oauth_code is required for platform connection"
+        )
+    
     return await AgentSocialConnectionController.connect_platform_account(
         platform_request, current_user, db
     )
@@ -187,6 +249,82 @@ async def disconnect_platform_account(
     """
     return await AgentSocialConnectionController.disconnect_platform_account(
         connection_id, current_user, db
+    )
+
+# =============================================================================
+# INSTAGRAM MESSAGING ENDPOINTS
+# =============================================================================
+
+@router.get("/{connection_id}/instagram/conversations", response_model=List[Dict[str, Any]])
+async def get_instagram_conversations(
+    connection_id: uuid.UUID,
+    limit: int = Query(25, ge=1, le=100, description="Number of conversations to fetch"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get Instagram conversations for a connected account
+    
+    Returns list of Instagram DM conversations with participants and metadata.
+    """
+    return await AgentSocialConnectionController.get_instagram_conversations(
+        connection_id, limit, current_user, db
+    )
+
+@router.get("/{connection_id}/instagram/conversations/{conversation_id}/messages")
+async def get_conversation_messages(
+    connection_id: uuid.UUID,
+    conversation_id: str,
+    limit: int = Query(25, ge=1, le=100, description="Number of messages to fetch"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get messages from an Instagram conversation
+    
+    Returns messages from a specific Instagram DM conversation.
+    """
+    return await AgentSocialConnectionController.get_conversation_messages(
+        connection_id, conversation_id, limit, current_user, db
+    )
+
+@router.post("/{connection_id}/instagram/send-message")
+async def send_instagram_message(
+    connection_id: uuid.UUID,
+    message_data: Dict[str, Any] = Body(..., example={
+        "recipient_id": "instagram_user_id",
+        "message_text": "Hello! Thanks for your message.",
+        "message_type": "text"
+    }),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Send Instagram direct message
+    
+    Send a DM to an Instagram user through connected business account.
+    """
+    return await AgentSocialConnectionController.send_instagram_message(
+        connection_id, message_data, current_user, db
+    )
+
+@router.post("/{connection_id}/instagram/setup-webhooks")
+async def setup_instagram_webhooks(
+    connection_id: uuid.UUID,
+    webhook_data: Dict[str, Any] = Body(..., example={
+        "webhook_url": "https://yourdomain.com/api/v0/webhooks/instagram",
+        "verify_token": "your_verify_token"
+    }),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Setup Instagram webhooks for real-time message updates
+    
+    Configure webhooks to receive real-time Instagram messaging events.
+    """
+    return await AgentSocialConnectionController.setup_instagram_webhooks(
+        connection_id, webhook_data, current_user, db
     )
 
 # =============================================================================
@@ -257,53 +395,8 @@ async def get_automation_status(
     Returns current automation settings, capabilities,
     error count, and last usage information.
     """
-    # Get connection first to check automation status
-    connection = await AgentSocialConnectionController.get_connection(
+    return await AgentSocialConnectionController.get_automation_status(
         connection_id, current_user, db
-    )
-    
-    return AutomationStatusResponse(
-        connection_id=str(connection_id),
-        is_automation_enabled=connection.is_active,  # You may want to add specific automation field
-        automation_capabilities=connection.automation_capabilities,
-        last_automation_use=connection.last_automation_use_at,
-        error_count=connection.automation_error_count,
-        last_error=connection.last_error_message
-    )
-
-# =============================================================================
-# HEALTH MONITORING
-# =============================================================================
-
-@router.get("/{connection_id}/health", response_model=ConnectionHealthCheck)
-async def check_connection_health(
-    connection_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Check the health status of a social connection.
-    
-    Analyzes token validity, error rates, recent activity,
-    and provides recommendations for maintaining connection health.
-    """
-    return await AgentSocialConnectionController.check_connection_health(
-        connection_id, current_user, db
-    )
-
-@router.get("/system/health", response_model=SystemHealthReport)
-async def get_system_health_report(
-    current_user: User = Depends(has_role(["platform_admin", "admin"])),
-    db: Session = Depends(get_db)
-):
-    """
-    Get system-wide health report for all social connections.
-    
-    Admin-only endpoint that provides overview of connection health
-    across all users and platforms.
-    """
-    return await AgentSocialConnectionController.get_system_health_report(
-        current_user, db
     )
 
 # =============================================================================
@@ -376,9 +469,9 @@ async def get_instagram_business_accounts(
     Returns business accounts that can be connected through
     the user's Facebook account connections.
     """
-    # This would integrate with your Instagram service
-    # For now, return placeholder response
-    return []
+    return await AgentSocialConnectionController.get_instagram_business_accounts(
+        current_user, db
+    )
 
 @router.post("/instagram/connect-business-account", response_model=AgentSocialConnectionDetailResponse)
 async def connect_instagram_business_account(
@@ -391,10 +484,8 @@ async def connect_instagram_business_account(
     
     Requires prior Facebook connection to access Instagram business accounts.
     """
-    # Implementation would go here
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Instagram business account connection not yet implemented"
+    return await AgentSocialConnectionController.connect_instagram_business_account(
+        instagram_data, current_user, db
     )
 
 @router.get("/whatsapp/business-profiles", response_model=List[Dict[str, Any]])
@@ -405,8 +496,9 @@ async def get_whatsapp_business_profiles(
     """
     Get available WhatsApp business profiles for the current user.
     """
-    # Implementation would integrate with WhatsApp Business API
-    return []
+    return await AgentSocialConnectionController.get_whatsapp_business_profiles(
+        current_user, db
+    )
 
 @router.post("/whatsapp/connect-business-profile", response_model=AgentSocialConnectionDetailResponse)
 async def connect_whatsapp_business_profile(
@@ -417,9 +509,8 @@ async def connect_whatsapp_business_profile(
     """
     Connect a WhatsApp business profile.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="WhatsApp business profile connection not yet implemented"
+    return await AgentSocialConnectionController.connect_whatsapp_business_profile(
+        whatsapp_data, current_user, db
     )
 
 # =============================================================================
@@ -439,97 +530,19 @@ async def get_platform_usage_analytics(
     Returns usage statistics for connected platforms including
     message counts, automation activity, and error rates.
     """
-    # Check permissions
-    is_admin = any(role.name in ["platform_admin", "admin"] for role in current_user.roles)
-    if user_id and not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can view other users' analytics"
-        )
-    
-    target_user_id = user_id if user_id else current_user.id
-    
-    # Implementation would analyze connection usage
-    # For now, return placeholder
-    return []
-
-@router.get("/analytics/error-report", response_model=List[Dict[str, Any]])
-async def get_connection_error_report(
-    platform_id: Optional[uuid.UUID] = Query(None, description="Filter by platform"),
-    days: int = Query(7, ge=1, le=30, description="Number of days to analyze"),
-    current_user: User = Depends(has_permission(["analytics:read"])),
-    db: Session = Depends(get_db)
-):
-    """
-    Get connection error report.
-    
-    Returns analysis of connection errors, common issues,
-    and recommendations for resolution.
-    """
-    # Implementation would analyze error patterns
-    return []
-
-# =============================================================================
-# MAINTENANCE AND UTILITIES
-# =============================================================================
-
-@router.post("/maintenance/cleanup-expired")
-async def cleanup_expired_connections(
-    dry_run: bool = Query(True, description="If true, only report what would be cleaned up"),
-    current_user: User = Depends(has_role(["platform_admin"])),
-    db: Session = Depends(get_db)
-):
-    """
-    Cleanup expired and inactive connections.
-    
-    Admin-only endpoint for maintenance operations.
-    """
-    # Implementation would clean up old/expired connections
-    return {"message": "Cleanup operation completed", "dry_run": dry_run}
-
-@router.post("/maintenance/refresh-all-tokens")
-async def refresh_all_expiring_tokens(
-    hours_threshold: int = Query(24, ge=1, le=168, description="Refresh tokens expiring within this many hours"),
-    current_user: User = Depends(has_role(["platform_admin"])),
-    db: Session = Depends(get_db)
-):
-    """
-    Bulk refresh tokens that are expiring soon.
-    
-    Admin-only endpoint for proactive token maintenance.
-    """
-    # Implementation would find and refresh expiring tokens
-    return {"message": "Token refresh operation completed"}
-
-@router.get("/statistics", response_model=Dict[str, Any])
-async def get_connection_statistics(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get connection statistics for the current user.
-    
-    Returns summary statistics including total connections,
-    active connections, platform breakdown, etc.
-    """
-    # Get user's platform status
-    status = await AgentSocialConnectionController.get_platform_connections_status(
-        None, current_user, db
+    return await AgentSocialConnectionController.get_platform_usage_analytics(
+        user_id, days, current_user, db
     )
+
+@router.get("/health", response_model=SystemHealthReport)
+async def get_system_health_report(
+    current_user: User = Depends(has_role(["platform_admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get system health report for all social connections.
     
-    # Calculate additional statistics
-    platform_breakdown = {}
-    for platform_status in status.platforms:
-        platform_breakdown[platform_status.platform_name] = {
-            "total": platform_status.connection_count,
-            "active": platform_status.active_connections,
-            "is_connected": platform_status.is_connected,
-            "last_connected": platform_status.last_connected
-        }
-    
-    return {
-        "total_connections": status.total_connections,
-        "active_connections": status.active_connections,
-        "platform_breakdown": platform_breakdown,
-        "connected_platforms": len([p for p in status.platforms if p.is_connected])
-    }
+    Returns overview of connection health, platform statistics,
+    and system-wide metrics.
+    """
+    return await AgentSocialConnectionController.get_system_health_report(db)

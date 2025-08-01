@@ -93,7 +93,9 @@ class Settings(BaseSettings):
     INSTAGRAM_APP_SECRET: str = os.getenv("INSTAGRAM_APP_SECRET", "")
     LINKEDIN_CLIENT_ID: str = os.getenv("LINKEDIN_CLIENT_ID", "")
     LINKEDIN_CLIENT_SECRET: str = os.getenv("LINKEDIN_CLIENT_SECRET", "")
- 
+    
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     # OAuth URLs
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:3000/oauth/callback")
