@@ -10,7 +10,8 @@ from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, RefreshTokenRequest, 
     LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset, UserDetailResponse,
     EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
-    ResendVerificationRequest, ManualVerificationRequest
+    ResendVerificationRequest, ManualVerificationRequest,
+    PasswordUpdate, PasswordUpdateResponse
 )
 from app.Utils.Helpers import get_current_active_user, get_current_user
 from config.database import get_db
@@ -84,34 +85,33 @@ async def get_me(current_user: User = Depends(get_current_active_user), db: Sess
 
 @router.put("/me", response_model=UserDetailResponse)
 async def update_profile(
-    # Support both JSON and form data for flexibility
-    first_name: Optional[str] = Form(None, max_length=100),
-    last_name: Optional[str] = Form(None, max_length=100),
-    full_name: Optional[str] = Form(None, max_length=255),
-    phone_number: Optional[str] = Form(None, max_length=20),
-    profile_image: Optional[UploadFile] = File(None),
+    user_data: UserUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update current user's profile including optional image upload
+    Update current user's profile (JSON only - no file upload)
     
     Supports:
     - Individual name fields (first_name, last_name)
     - Full name (for backward compatibility)
     - Phone number
-    - Profile image upload (optional)
     
-    Can update any combination of fields in a single request.
+    Send JSON data like:
+    {
+        "first_name": "John",
+        "last_name": "Doe", 
+        "phone_number": "+1234567890"
+    }
     """
     updated_user = await AuthController.update_profile(
         db=db,
         current_user=current_user,
-        first_name=first_name,
-        last_name=last_name,
-        full_name=full_name,
-        phone_number=phone_number,
-        profile_image=profile_image
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        full_name=user_data.full_name,
+        phone_number=user_data.phone_number,
+        profile_image=None  # No image upload in JSON endpoint
     )
     
     return UserDetailResponse.from_orm(updated_user)
@@ -124,6 +124,28 @@ async def delete_current_user_profile_image(
     """Delete current user's profile image"""
     return await AuthController.delete_profile_image(db=db, current_user=current_user)
 
+
+@router.put("/me/password", response_model=PasswordUpdateResponse)
+async def update_password(
+    password_data: PasswordUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's password
+    
+    Requires:
+    - current_password: User's current password for verification
+    - new_password: New password (must meet complexity requirements)
+    - confirm_password: Confirmation of new password
+    
+    Security features:
+    - Verifies current password before allowing change
+    - Enforces password complexity requirements
+    - Prevents using the same password as current
+    - Revokes all refresh tokens (optional security measure)
+    """
+    return await AuthController.update_password(password_data, current_user, db)
 
 @router.post("/verify-email", response_model=EmailVerificationResponse)
 async def verify_email(

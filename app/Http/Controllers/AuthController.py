@@ -14,7 +14,8 @@ from app.Schemas.auth import (
     LoginResponse, RoleResponse, PasswordResetRequest, 
     PasswordReset, UserUpdate, CompanyBriefResponse, UserDetailResponse,
     EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
-    ResendVerificationRequest, ManualVerificationRequest
+    ResendVerificationRequest, ManualVerificationRequest,
+    PasswordUpdate, PasswordUpdateResponse
 )
 from app.Schemas.company import CompanyCreate
 from app.Models.auth_models import User, Role, RefreshToken, UserStatus
@@ -25,7 +26,7 @@ from app.Utils.Helpers import get_current_user, get_current_active_user
 from app.Utils.Logger import logger
 from config.settings import settings
 from app.Services.CompanyService import CompanyService
-from app.Services.GoogleCloudStorageService import gcs_service
+# from app.Services.GoogleCloudStorageService import gcs_service
 from app.Utils.Logger import logger
 
 # Configuration for JWT
@@ -516,24 +517,24 @@ class AuthController:
             if profile_image and profile_image.filename:
                 try:
                     # Upload new image to GCS
-                    file_path, public_url = await gcs_service.upload_profile_image(
-                        file=profile_image,
-                        user_id=str(current_user.id),
-                        optimize=True
-                    )
+                    # file_path, public_url = await gcs_service.upload_profile_image(
+                    #     file=profile_image,
+                    #     user_id=str(current_user.id),
+                    #     optimize=True
+                    # )
                     
-                    # Delete old profile image if exists
-                    if current_user.profile_image_url:
-                        old_file_path = current_user.profile_image_url.split('/')[-2:]
-                        if len(old_file_path) == 2:
-                            old_path = f"profile-images/{old_file_path[0]}/{old_file_path[1]}"
-                            await gcs_service.delete_profile_image(old_path)
+                    # # Delete old profile image if exists
+                    # if current_user.profile_image_url:
+                    #     old_file_path = current_user.profile_image_url.split('/')[-2:]
+                    #     if len(old_file_path) == 2:
+                    #         old_path = f"profile-images/{old_file_path[0]}/{old_file_path[1]}"
+                    #         await gcs_service.delete_profile_image(old_path)
                     
                     # Update profile image URL
-                    current_user.profile_image_url = public_url
-                    changes_made = True
-                    logger.info(f"Profile image updated for user {current_user.id}")
-                    
+                    # current_user.profile_image_url = public_url
+                    # changes_made = True
+                    # logger.info(f"Profile image updated for user {current_user.id}")
+                    print(f"aaa")
                 except Exception as e:
                     logger.error(f"Failed to upload profile image for user {current_user.id}: {str(e)}")
                     raise HTTPException(
@@ -585,7 +586,7 @@ class AuthController:
             if phone_number is not None:
                 current_user.phone_number = phone_number.strip() or None
                 changes_made = True
-            
+            print(f"changes_made::", changes_made)
             # Only commit if changes were made
             if changes_made:
                 db.commit()
@@ -625,7 +626,7 @@ class AuthController:
             url_parts = current_user.profile_image_url.split('/')
             if len(url_parts) >= 2:
                 file_path = f"profile-images/{url_parts[-2]}/{url_parts[-1]}"
-                await gcs_service.delete_profile_image(file_path)
+                # await gcs_service.delete_profile_image(file_path)
             
             # Update database
             current_user.profile_image_url = None
@@ -859,4 +860,46 @@ class AuthController:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error completing company registration: {str(e)}"
+            )
+        
+    @staticmethod
+    async def update_password(password_data: 'PasswordUpdate', current_user: User, db: Session):
+        """Update current user's password"""
+        try:
+            # Verify current password
+            if not AuthController.verify_password(password_data.current_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect"
+                )
+            
+            # Check if new password is different from current password
+            if AuthController.verify_password(password_data.new_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="New password must be different from current password"
+                )
+            
+            # Update password
+            current_user.hashed_password = AuthController.get_password_hash(password_data.new_password)
+            
+            # Optional: Revoke all refresh tokens for security (force re-login on all devices)
+            db.query(RefreshToken).filter(RefreshToken.user_id == current_user.id).update({"is_revoked": True})
+            
+            # Update password changed timestamp (if you have this field)
+            # current_user.password_changed_at = datetime.utcnow()
+            
+            db.commit()
+            
+            return {"message": "Password updated successfully. Please log in again."}
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Error updating password for user {current_user.id}: {str(e)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An error occurred while updating password"
             )

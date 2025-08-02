@@ -370,3 +370,30 @@ class ProfileImageResponse(BaseModel):
     message: str
     profile_image_url: str
     file_path: str
+
+class PasswordUpdate(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
+    
+    @field_validator('confirm_password')
+    def passwords_match(cls, v: str, info) -> str:
+        if v != info.data.get('new_password'):
+            raise ValueError('New password and confirm password do not match')
+        return v
+    
+    @field_validator('new_password')
+    def password_strength(cls, v: str) -> str:
+        """Validate password meets complexity requirements"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Password must contain at least one number')
+        return v
+
+class PasswordUpdateResponse(BaseModel):
+    message: str
