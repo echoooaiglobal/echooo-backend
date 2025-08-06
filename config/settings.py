@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "Influencer Marketing Platform"
     API_V0_STR: str = "/api/v0"
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
-    
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+
     # Instagram URL
     INSTAGRAM_URL: str = os.getenv("INSTAGRAM_BASE_URL", "https://www.instagram.com")
 
@@ -57,7 +58,6 @@ class Settings(BaseSettings):
     SHOPIFY_WEBHOOK_SECRET: Optional[str] = os.getenv("SHOPIFY_WEBHOOK_SECRET")
     DISABLE_WEBHOOK_SIGNATURE_VERIFICATION: bool = os.getenv("DISABLE_WEBHOOK_SIGNATURE_VERIFICATION", "True").lower() == "true"
 
-    
     # Database settings
     DB_TYPE: str = os.getenv("DB_TYPE", "postgresql")
     DB_USERNAME: str = os.getenv("DB_USERNAME", "postgres")
@@ -68,25 +68,20 @@ class Settings(BaseSettings):
     
     # Email settings
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() == "true"
-    SMTP_PORT: Optional[int] = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_PORT: Optional[int] = int(os.getenv("SMTP_PORT", "587")) if os.getenv("SMTP_PORT") else None
     SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST")
     SMTP_USER: Optional[str] = os.getenv("SMTP_USER")
     SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
     EMAILS_FROM_EMAIL: Optional[str] = os.getenv("EMAILS_FROM_EMAIL")
     EMAILS_FROM_NAME: Optional[str] = os.getenv("EMAILS_FROM_NAME")
     
-    # File storage settings
-    UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "uploads")
-    MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "5242880"))  # 5MB
-    
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
     RATE_LIMIT_PERIOD_SECONDS: int = int(os.getenv("RATE_LIMIT_PERIOD_SECONDS", "3600"))
 
-
     # OAuth Provider Settings
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
-    GOOGLE_CLIENT_SECRET: str =os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     FACEBOOK_APP_ID: str = os.getenv("FACEBOOK_APP_ID", "")
     FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
     INSTAGRAM_APP_ID: str = os.getenv("INSTAGRAM_APP_ID", "")
@@ -96,18 +91,16 @@ class Settings(BaseSettings):
     
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    # OAuth URLs
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:3000/oauth/callback")
     
     # Token encryption key for storing OAuth tokens securely
     # Generate using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    TOKEN_ENCRYPTION_KEY: str = ""
+    TOKEN_ENCRYPTION_KEY: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
 
     # Google Cloud Storage Configuration
     GCS_BUCKET_NAME: str = os.getenv("GCS_BUCKET_NAME", "")
     GCS_PROJECT_ID: str = os.getenv("GCS_PROJECT_ID", "")
-    GCS_SERVICE_ACCOUNT_PATH: str = os.getenv("GCS_SERVICE_ACCOUNT_PATH", "gcs-service-account.json")
+    GCS_SERVICE_ACCOUNT_PATH: str = os.getenv("GCS_SERVICE_ACCOUNT_PATH", "credentials/gcs-dev-service-account.json")
     GCS_BASE_URL: str = os.getenv("GCS_BASE_URL", "https://storage.googleapis.com")
     GCS_CDN_URL: Optional[str] = os.getenv("GCS_CDN_URL")
     
@@ -118,19 +111,21 @@ class Settings(BaseSettings):
         "image/jpeg,image/jpg,image/png,image/webp"
     )
     
-    # File storage settings (existing, update max size)
+    # File storage settings - FIXED: Removed duplicate and fixed order
     UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "uploads")
     MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))  # 10MB for other files
 
-    def __post_init__(self):
-        """Validate GCS configuration"""
-        if not self.GCS_BUCKET_NAME or not self.GCS_PROJECT_ID:
-            raise ValueError("GCS_BUCKET_NAME and GCS_PROJECT_ID must be set")
-        
-        if not os.path.exists(self.GCS_SERVICE_ACCOUNT_PATH):
-            # Check if we're in a production environment with IAM roles
-            if not os.getenv("GOOGLE_CLOUD_PROJECT"):
-                raise ValueError(f"GCS service account file not found: {self.GCS_SERVICE_ACCOUNT_PATH}")
+    def get_bucket_name(self) -> str:
+        """Get bucket name based on environment"""
+        if self.ENVIRONMENT == "production":
+            return os.getenv("GCS_BUCKET_NAME", "echooo-media-prod-asia")
+        elif self.ENVIRONMENT == "staging":
+            return os.getenv("GCS_BUCKET_NAME", "echooo-media-staging-asia")
+        else:  # development
+            return os.getenv("GCS_BUCKET_NAME", "echooo-media-dev-asia")
+    
+    # FIXED: Removed __post_init__ (not supported by Pydantic BaseSettings)
+    # Use model_validate or custom validation instead
     
     # For Pydantic v2
     if PYDANTIC_V2:
@@ -163,6 +158,25 @@ class Settings(BaseSettings):
             if isinstance(v, (list, str)):
                 return v
             raise ValueError(v)
+        
+        # ADDED: GCS validation for Pydantic v2
+        @field_validator('GCS_BUCKET_NAME', 'GCS_PROJECT_ID')
+        @classmethod
+        def validate_gcs_config(cls, v, info):
+            field_name = info.field_name
+            if field_name in ['GCS_BUCKET_NAME', 'GCS_PROJECT_ID'] and not v:
+                # Only warn, don't fail - allows gradual setup
+                print(f"Warning: {field_name} is not set. GCS features will not work.")
+            return v
+            
+        @field_validator('GCS_SERVICE_ACCOUNT_PATH')
+        @classmethod
+        def validate_service_account_path(cls, v):
+            if v and not os.path.exists(v):
+                # Check if we're in a production environment with IAM roles
+                if not os.getenv("GOOGLE_CLOUD_PROJECT"):
+                    print(f"Warning: GCS service account file not found: {v}")
+            return v
     else:
         @validator("BACKEND_CORS_ORIGINS", pre=True)
         def assemble_cors_origins(cls, v):
@@ -171,6 +185,20 @@ class Settings(BaseSettings):
             if isinstance(v, (list, str)):
                 return v
             raise ValueError(v)
+        
+        # ADDED: GCS validation for Pydantic v1
+        @validator('GCS_BUCKET_NAME', 'GCS_PROJECT_ID')
+        def validate_gcs_config(cls, v, field):
+            if field.name in ['GCS_BUCKET_NAME', 'GCS_PROJECT_ID'] and not v:
+                print(f"Warning: {field.name} is not set. GCS features will not work.")
+            return v
+            
+        @validator('GCS_SERVICE_ACCOUNT_PATH')
+        def validate_service_account_path(cls, v):
+            if v and not os.path.exists(v):
+                if not os.getenv("GOOGLE_CLOUD_PROJECT"):
+                    print(f"Warning: GCS service account file not found: {v}")
+            return v
 
 # Create settings instance
 settings = Settings()

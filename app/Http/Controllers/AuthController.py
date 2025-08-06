@@ -26,7 +26,7 @@ from app.Utils.Helpers import get_current_user, get_current_active_user
 from app.Utils.Logger import logger
 from config.settings import settings
 from app.Services.CompanyService import CompanyService
-# from app.Services.GoogleCloudStorageService import gcs_service
+from app.Services.GoogleCloudStorageService import gcs_service
 from app.Utils.Logger import logger
 
 # Configuration for JWT
@@ -512,29 +512,30 @@ class AuthController:
             
             # Track if any changes were made
             changes_made = False
-            
+            print(f"profile_image:1", profile_image)
             # Handle profile image upload first (if provided)
             if profile_image and profile_image.filename:
+                print(f"profile_image:2", profile_image.filename)
                 try:
                     # Upload new image to GCS
-                    # file_path, public_url = await gcs_service.upload_profile_image(
-                    #     file=profile_image,
-                    #     user_id=str(current_user.id),
-                    #     optimize=True
-                    # )
+                    file_path, public_url = await gcs_service.upload_profile_image(
+                        file=profile_image,
+                        user_id=str(current_user.id),
+                        optimize=True
+                    )
                     
-                    # # Delete old profile image if exists
-                    # if current_user.profile_image_url:
-                    #     old_file_path = current_user.profile_image_url.split('/')[-2:]
-                    #     if len(old_file_path) == 2:
-                    #         old_path = f"profile-images/{old_file_path[0]}/{old_file_path[1]}"
-                    #         await gcs_service.delete_profile_image(old_path)
+                    # Delete old profile image if exists - UNCOMMENT THESE LINES:
+                    if current_user.profile_image_url:
+                        old_file_path = current_user.profile_image_url.split('/')[-2:]
+                        if len(old_file_path) == 2:
+                            old_path = f"profile-images/{old_file_path[0]}/{old_file_path[1]}"
+                            await gcs_service.delete_profile_image(old_path)
                     
-                    # Update profile image URL
-                    # current_user.profile_image_url = public_url
-                    # changes_made = True
-                    # logger.info(f"Profile image updated for user {current_user.id}")
-                    print(f"aaa")
+                    # Update profile image URL - UNCOMMENT THESE LINES:
+                    current_user.profile_image_url = public_url
+                    changes_made = True
+                    logger.info(f"Profile image updated for user {current_user.id}")
+
                 except Exception as e:
                     logger.error(f"Failed to upload profile image for user {current_user.id}: {str(e)}")
                     raise HTTPException(
@@ -626,7 +627,7 @@ class AuthController:
             url_parts = current_user.profile_image_url.split('/')
             if len(url_parts) >= 2:
                 file_path = f"profile-images/{url_parts[-2]}/{url_parts[-1]}"
-                # await gcs_service.delete_profile_image(file_path)
+                await gcs_service.delete_profile_image(file_path)
             
             # Update database
             current_user.profile_image_url = None

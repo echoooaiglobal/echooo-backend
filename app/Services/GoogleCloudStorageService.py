@@ -61,17 +61,7 @@ class GoogleCloudStorageService:
         user_id: str,
         optimize: bool = True
     ) -> Tuple[str, str]:
-        """
-        Upload profile image to GCS
-        
-        Args:
-            file: Upload file object
-            user_id: User ID for organizing files
-            optimize: Whether to optimize the image
-            
-        Returns:
-            Tuple of (file_path, public_url)
-        """
+        """Upload profile image to GCS with professional naming"""
         try:
             # Validate file
             self._validate_image_file(file)
@@ -84,13 +74,16 @@ class GoogleCloudStorageService:
             if optimize:
                 file_content = self._optimize_image(file_content, file.content_type)
             
-            # Generate unique filename
+            # PROFESSIONAL FILE NAMING:
             file_extension = self._get_file_extension(file.filename, file.content_type)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_filename = f"{uuid.uuid4().hex}_{timestamp}{file_extension}"
+            short_uuid = str(uuid.uuid4()).replace('-', '')[:12]  # 12 character UUID
             
-            # Create file path
-            file_path = f"profile-images/{user_id}/{unique_filename}"
+            # Professional filename: user-id_timestamp_uuid.ext
+            filename = f"{user_id}_{timestamp}_{short_uuid}{file_extension}"
+            
+            # PROFESSIONAL PATH STRUCTURE:
+            file_path = f"profile-images/avatars/{user_id}/{filename}"
             
             # Upload to GCS
             blob = self._bucket.blob(file_path)
@@ -99,10 +92,7 @@ class GoogleCloudStorageService:
                 content_type=file.content_type
             )
             
-            # Make blob publicly readable
-            blob.make_public()
-            
-            # Get public URL
+            # Get public URL (works because your bucket is public)
             public_url = self._get_public_url(file_path)
             
             logger.info(f"Profile image uploaded successfully: {file_path}")

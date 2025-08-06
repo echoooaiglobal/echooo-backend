@@ -85,24 +85,49 @@ async def get_me(current_user: User = Depends(get_current_active_user), db: Sess
 
 @router.put("/me", response_model=UserDetailResponse)
 async def update_profile(
+    # Form fields (for multipart/form-data)
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
+    full_name: Optional[str] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    language: Optional[str] = Form(None),  # Add this if you need it
+    # File upload
+    profile_image: Optional[UploadFile] = File(None),
+    # Keep current user and db
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's profile with optional image upload
+    
+    Accepts multipart/form-data with:
+    - Text fields: first_name, last_name, full_name, phone_number
+    - File field: profile_image (optional)
+    
+    Frontend should send as FormData, not JSON
+    """
+    updated_user = await AuthController.update_profile(
+        db=db,
+        current_user=current_user,
+        first_name=first_name,
+        last_name=last_name,
+        full_name=full_name,
+        phone_number=phone_number,
+        profile_image=profile_image  # This will now work!
+    )
+    
+    return UserDetailResponse.from_orm(updated_user)
+
+# JSON-only version for backward compatibility
+@router.patch("/me", response_model=UserDetailResponse)
+async def update_profile_json(
     user_data: UserUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Update current user's profile (JSON only - no file upload)
-    
-    Supports:
-    - Individual name fields (first_name, last_name)
-    - Full name (for backward compatibility)
-    - Phone number
-    
-    Send JSON data like:
-    {
-        "first_name": "John",
-        "last_name": "Doe", 
-        "phone_number": "+1234567890"
-    }
+    Use this for text-only updates, use PUT /auth/me for file uploads
     """
     updated_user = await AuthController.update_profile(
         db=db,

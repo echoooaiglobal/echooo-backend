@@ -172,3 +172,19 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Google Cloud Service Account Credentials
+credentials/
+*.json
+!credentials/.gitkeep
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+
+# Google Cloud Storage temp files
+gcs-*.json
+*service-account*.json
