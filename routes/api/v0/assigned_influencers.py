@@ -1,7 +1,7 @@
 # routes/api/v0/assigned_influencers.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 import uuid
 
 from app.Http.Controllers.AssignedInfluencerController import AssignedInfluencerController
@@ -14,7 +14,7 @@ from app.Schemas.assigned_influencer import (
     RecordContactResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 

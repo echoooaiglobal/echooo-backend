@@ -1,5 +1,5 @@
 # routes/api/v0/users.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
@@ -9,7 +9,7 @@ from app.Models.auth_models import User
 from app.Schemas.auth import UserResponse, UserDetailResponse, UserUpdate
 from app.Schemas.role import UserRoleAssignment, BulkUserRoleAssignment, UserRoleResponse
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 

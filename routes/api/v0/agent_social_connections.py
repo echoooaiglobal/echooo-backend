@@ -1,6 +1,5 @@
 # routes/api/v0/agent_social_connections.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import uuid
@@ -8,20 +7,19 @@ from datetime import datetime
 
 from app.Http.Controllers.AgentSocialConnectionController import AgentSocialConnectionController
 from app.Models.auth_models import User
-from app.Models.platforms import Platform
 from app.Schemas.agent_social_connection import (
     AgentSocialConnectionCreate, AgentSocialConnectionUpdate,
-    AgentSocialConnectionResponse, AgentSocialConnectionDetailResponse,
+    AgentSocialConnectionDetailResponse,
     AgentSocialConnectionsPaginatedResponse, UserPlatformConnectionsStatus,
     TokenValidationRequest, TokenValidationResponse,
     AutomationToggleRequest, AutomationStatusResponse,
-    ConnectionHealthCheck, SystemHealthReport,
+    SystemHealthReport,
     BulkConnectionUpdate, BulkOperationResponse,
     PlatformConnectionRequest, PlatformConnectionInitiateRequest,
-    OAuthInitiateResponse, OAuthCallbackResponse
+    OAuthInitiateResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    get_current_active_user, has_role
 )
 from config.database import get_db
 

@@ -1,9 +1,8 @@
 # app/Utils/scheduler.py
 
-import asyncio
 import pytz
-from datetime import datetime, time
-from typing import List, Dict, Any
+from datetime import datetime
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger

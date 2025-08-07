@@ -1,8 +1,8 @@
 # app/Models/campaigns.py
 
 import uuid
-from sqlalchemy import Column, String, Text, Boolean, Integer, ForeignKey, DateTime, Numeric, Enum, func, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Text, Boolean, ForeignKey, DateTime, Numeric, func, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.Models.base import Base
 

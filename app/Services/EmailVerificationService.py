@@ -1,10 +1,9 @@
 # app/Services/EmailVerificationService.py
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import HTTPException, status
 import uuid
-from datetime import datetime
 
 from app.Models.auth_models import User, EmailVerificationToken, UserStatus
 from app.Utils.Logger import logger

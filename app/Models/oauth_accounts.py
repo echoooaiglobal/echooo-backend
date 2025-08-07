@@ -1,6 +1,5 @@
 # app/Models/oauth_accounts.py
 import uuid
-from datetime import datetime
 from sqlalchemy import Column, String, Text, Boolean, DateTime, func, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship

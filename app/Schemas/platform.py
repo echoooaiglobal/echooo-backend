@@ -1,5 +1,5 @@
 # app/Schemas/platform.py
-from pydantic import BaseModel, Field, field_validator, HttpUrl
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid

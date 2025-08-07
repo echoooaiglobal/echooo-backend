@@ -1,6 +1,5 @@
 # routes/api/v0/companies.py
-from fastapi import APIRouter
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -12,7 +11,7 @@ from app.Schemas.company import (
     CompanyContactCreate, CompanyContactUpdate, CompanyContactResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission, is_company_admin
+    get_current_active_user, has_permission, is_company_admin
 )
 from config.database import get_db
 

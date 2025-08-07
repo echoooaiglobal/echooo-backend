@@ -1,7 +1,5 @@
 # app/Http/Controllers/InfluencerController.py
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import uuid
 
 from app.Schemas.influencer import (

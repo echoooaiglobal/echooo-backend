@@ -1,7 +1,6 @@
 # app/Schemas/role.py
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
-from datetime import datetime
 import uuid
 
 # Permission Schemas

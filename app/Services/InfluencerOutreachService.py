@@ -1,19 +1,14 @@
 # app/Services/InfluencerOutreachService.py
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc
+from sqlalchemy import and_, func, desc
 from typing import List, Dict, Any, Optional, Tuple
 import uuid
-import math
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.Models.influencer_outreach import InfluencerOutreach
 from app.Models.assigned_influencers import AssignedInfluencer
-from app.Models.agent_assignments import AgentAssignment
 from app.Models.outreach_agents import OutreachAgent
-from app.Models.agent_social_connections import AgentSocialConnection
-from app.Models.communication_channels import CommunicationChannel
-from app.Models.statuses import Status
 from app.Utils.Logger import logger
 
 class InfluencerOutreachService:

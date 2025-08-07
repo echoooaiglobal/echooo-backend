@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 from app.Models.agent_social_connections import AgentSocialConnection
 from app.Models.platforms import Platform
 from app.Models.auth_models import User
-from app.Models.outreach_agents import OutreachAgent
-from app.Models.statuses import Status
 from app.Schemas.agent_social_connection import (
     AgentSocialConnectionCreate, AgentSocialConnectionUpdate,
     AgentSocialConnectionDetailResponse, AgentSocialConnectionsPaginatedResponse,
@@ -18,7 +16,7 @@ from app.Schemas.agent_social_connection import (
     AutomationToggleRequest, AutomationStatusResponse,
     SystemHealthReport, UserBrief, PlatformBrief, AgentBrief, StatusBrief
 )
-from app.Utils.encryption import encrypt_token, decrypt_token
+from app.Utils.encryption import encrypt_token
 from app.Utils.Logger import logger
 
 class AgentSocialConnectionService:

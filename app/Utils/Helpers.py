@@ -1,11 +1,11 @@
 # app/Utils/Helpers.py
-from fastapi import Depends, HTTPException, status, Path, Request
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from typing import List, Optional, Union
+from typing import List
 import uuid
-from app.Models.auth_models import User, Role, UserStatus
+from app.Models.auth_models import User, UserStatus
 from app.Schemas.auth import TokenData
 from config.database import get_db
 from app.Utils.Logger import logger

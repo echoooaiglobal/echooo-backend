@@ -1,11 +1,11 @@
 # app/Http/Controllers/MessageTemplateController.py
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import Dict, Any
 import uuid
 
 from app.Models.auth_models import User
-from app.Schemas.message_templates import MessageTemplateCreate, MessageTemplateUpdate, MessageTemplateResponse
+from app.Schemas.message_templates import MessageTemplateUpdate, MessageTemplateResponse
 from app.Services.MessageTemplateService import MessageTemplateService
 from app.Utils.Logger import logger
 

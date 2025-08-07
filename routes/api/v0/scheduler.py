@@ -4,7 +4,7 @@
 API endpoints for managing the daily reset scheduler
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from pydantic import BaseModel

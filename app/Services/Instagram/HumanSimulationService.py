@@ -2,7 +2,7 @@ from playwright.async_api import Page
 import asyncio
 import random
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 from app.Services.Utils.RandomizationUtil import RandomizationUtil
 from app.Services.Utils.BehaviorPatternUtil import BehaviorPatternUtil
 from app.Services.Instagram.BrowsingService import BrowsingService
@@ -497,7 +497,7 @@ class HumanSimulationService:
                 await self.randomizer.human_delay(1, 2)
             
             # Improved method to find profiles
-            usernames = await self.page.evaluate("""() => {
+            usernames = await self.page.evaluate(r"""() => {
                 // Better selector targeting username elements
                 const usernameSelectorOptions = [
                     'span._aap6._aap7._aap8', // Username in post headers
@@ -518,7 +518,7 @@ class HumanSimulationService:
                                 // For <a> tags, extract username from href
                                 const href = el.getAttribute('href');
                                 if (href && href.startsWith('/') && href.length > 1) {
-                                    username = href.replace(/^\/|\/$/g, '').split('?')[0];
+                                    username = href.replace(/^\/|\/$/, '').split('?')[0];
                                 }
                             } else {
                                 // For text elements, use the text content
@@ -548,7 +548,7 @@ class HumanSimulationService:
                             for (const link of links) {
                                 const href = link.getAttribute('href');
                                 if (href && href.startsWith('/') && href.length > 1 && !href.includes('/p/')) {
-                                    const username = href.replace(/^\/|\/$/g, '').split('?')[0];
+                                    const username = href.replace(/^\/|\/$/, '').split('?')[0];
                                     if (username && username.length > 2) {
                                         foundUsernames.push(username);
                                     }
@@ -620,7 +620,7 @@ class HumanSimulationService:
                 await self.randomizer.human_delay(2, 3)
                 
                 # Get profile links from search results
-                usernames = await self.page.evaluate("""(searchTerm) => {
+                usernames = await self.page.evaluate(r"""(searchTerm) => {
                     const profileLinks = Array.from(document.querySelectorAll('a[role="link"]'))
                         .filter(link => {
                             const href = link.getAttribute('href');
@@ -632,7 +632,7 @@ class HumanSimulationService:
                         });
                     
                     return profileLinks.map(link => {
-                        return link.getAttribute('href').replace(/^\/|\/$/g, '').split('?')[0];
+                        return link.getAttribute('href').replace(/^\/|\/$/, '').split('?')[0];
                     }).filter(username => 
                         username && 
                         username.length > 2 && 

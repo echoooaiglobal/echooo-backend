@@ -1,5 +1,5 @@
 # app/Schemas/category.py
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 import uuid
 from typing import Optional, List
 from datetime import datetime

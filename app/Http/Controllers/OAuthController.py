@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from app.Services.OAuthService import OAuthService
 from app.Http.Controllers.AuthController import AuthController
-from app.Models.auth_models import User, UserStatus, Role
+from app.Models.auth_models import User, Role
 from app.Models.oauth_accounts import OAuthAccount
 from app.Models.company_models import Company, CompanyUser
 from app.Schemas.auth import RoleResponse, CompanyBriefResponse, UserResponse

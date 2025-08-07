@@ -1,12 +1,12 @@
 # app/Http/Controllers/UserController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func
-from typing import List, Dict, Any, Optional
+from sqlalchemy import or_
+from typing import List, Optional
 import uuid
 
 from app.Models.auth_models import User, Role, UserStatus
-from app.Models.company_models import Company, CompanyUser
+from app.Models.company_models import CompanyUser
 from app.Schemas.auth import (
     UserResponse, UserDetailResponse, UserUpdate, 
     RoleResponse, CompanyBriefResponse

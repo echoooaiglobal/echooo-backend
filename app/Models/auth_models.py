@@ -2,7 +2,7 @@
 import uuid
 import enum
 from datetime import datetime, timedelta
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime, func, Index, event
+from sqlalchemy import Column, String, Boolean, ForeignKey, Table, DateTime, func, Index, event
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -129,6 +129,7 @@ class User(Base):
 @event.listens_for(User.last_name, 'set')
 def update_full_name(target, value, oldvalue, initiator):
     """Automatically update full_name when first_name or last_name changes"""
+    del oldvalue, initiator  # Unused parameters required by SQLAlchemy event listener
     if hasattr(target, 'first_name') and hasattr(target, 'last_name'):
         if target.first_name and target.last_name:
             target.full_name = f"{target.first_name} {target.last_name}"

@@ -1,6 +1,6 @@
 # app/Models/order_models.py
 import uuid
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, DateTime, Text, Numeric, JSON, Index
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, Numeric, JSON, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func

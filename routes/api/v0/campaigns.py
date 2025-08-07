@@ -1,5 +1,5 @@
 # routes/api/v0/campaigns.py - Updated version
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -11,10 +11,8 @@ from app.Schemas.campaign import (
     CampaignListResponse
 )
 
-from app.Services.CampaignService import CampaignService
-
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 

@@ -10,10 +10,10 @@ from app.Http.Controllers.InfluencerContactController import InfluencerContactCo
 from app.Models.auth_models import User
 from app.Schemas.influencer_contact import (
     InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse,
-    InfluencerContactBulkCreate, InfluencerContactBulkResponse, InfluencerContactFilter
+    InfluencerContactBulkCreate, InfluencerContactBulkResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from app.Utils.Logger import logger
 from config.database import get_db

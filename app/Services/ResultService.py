@@ -1,11 +1,10 @@
 # app/Services/ResultService.py
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_, desc, asc
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 from fastapi import HTTPException, status
-from math import ceil
 
 from app.Models.results import Result
 from app.Models.campaigns import Campaign

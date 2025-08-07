@@ -1,5 +1,4 @@
 # app/Services/Instagram/LoginService.py
-import os
 import json
 import random
 from pathlib import Path
@@ -23,6 +22,7 @@ class LoginService:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        del exc_type, exc_val, exc_tb  # Unused parameters required by async context manager protocol
         if self.browser:
             await self.browser.close()
         if self.playwright:

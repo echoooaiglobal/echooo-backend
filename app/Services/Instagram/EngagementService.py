@@ -1,7 +1,7 @@
 from playwright.async_api import Page
 import asyncio
 import random
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional
 from app.Services.Utils.RandomizationUtil import RandomizationUtil
 
 class EngagementService:

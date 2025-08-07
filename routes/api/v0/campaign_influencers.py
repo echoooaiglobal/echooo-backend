@@ -19,7 +19,7 @@ from app.Schemas.campaign_influencer import (
 )
 
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_permission
 )
 from config.database import get_db
 

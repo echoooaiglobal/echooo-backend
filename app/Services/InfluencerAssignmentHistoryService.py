@@ -1,10 +1,10 @@
 # app/Services/InfluencerAssignmentHistoryService.py
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc, asc, extract
+from sqlalchemy import and_, func, desc, asc, extract
 from typing import List, Dict, Any, Optional, Tuple
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.Models.influencer_assignment_histories import InfluencerAssignmentHistory
 from app.Models.reassignment_reasons import ReassignmentReason

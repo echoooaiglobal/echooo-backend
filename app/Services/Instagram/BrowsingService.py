@@ -1,7 +1,7 @@
 from playwright.async_api import Page
 import asyncio
 import random
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Dict, Any
 from app.Services.Utils.RandomizationUtil import RandomizationUtil
 from config.settings import settings
 from urllib.parse import urlparse

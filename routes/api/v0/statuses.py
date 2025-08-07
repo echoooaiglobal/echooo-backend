@@ -1,5 +1,5 @@
 # routes/api/v0/statuses.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -10,7 +10,7 @@ from app.Schemas.campaign import (
     StatusCreate, StatusUpdate, StatusResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role
 )
 from config.database import get_db
 

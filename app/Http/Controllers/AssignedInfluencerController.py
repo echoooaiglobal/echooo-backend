@@ -1,7 +1,7 @@
 # app/Http/Controllers/AssignedInfluencerController.py
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import uuid
 import math
 
@@ -9,7 +9,7 @@ from app.Models.assigned_influencers import AssignedInfluencer
 from app.Schemas.assigned_influencer import (
     AssignedInfluencerResponse, AssignedInfluencerListResponse,
     AssignedInfluencerStatsResponse, CampaignInfluencerBrief,
-    AgentAssignmentBrief, StatusBrief, SocialAccountBrief, RecordContactResponse
+    StatusBrief, SocialAccountBrief, RecordContactResponse
 )
 from app.Schemas.common import PaginationInfo
 from app.Services.AssignedInfluencerService import AssignedInfluencerService

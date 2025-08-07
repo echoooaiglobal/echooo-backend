@@ -1,7 +1,7 @@
 # app/Models/agent_assignments.py
 
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, func, Index, Boolean
+from sqlalchemy import Column, ForeignKey, DateTime, func, Index, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.Models.base import Base

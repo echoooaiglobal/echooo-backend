@@ -1,6 +1,6 @@
 # app/Schemas/order.py
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 import uuid

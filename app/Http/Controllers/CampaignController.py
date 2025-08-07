@@ -1,16 +1,12 @@
 # app/Http/Controllers/CampaignController.py - Updated version
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session, object_session
-from typing import List, Dict, Any
 import uuid
 
 from app.Models.auth_models import User
-from app.Models.campaigns import Campaign
 from app.Schemas.campaign import (
     CampaignCreate, CampaignUpdate, CampaignResponse, CategoryBrief, StatusBrief,
     CampaignListResponse, CampaignListBrief, ListAssignmentBrief, MessageTemplatesBrief
 )
-from app.Models.campaign_lists import CampaignList
 
 from app.Services.CampaignService import CampaignService
 from app.Services.CampaignListService import CampaignListService

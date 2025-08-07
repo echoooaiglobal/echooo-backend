@@ -1,9 +1,8 @@
 # app/Services/GoogleCloudStorageService.py
 import os
 import uuid
-import mimetypes
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Tuple, List
 from io import BytesIO
 from PIL import Image
 import logging

@@ -1,5 +1,5 @@
 # routes/api/v0/results.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -11,7 +11,7 @@ from app.Schemas.results import (
     CampaignResultsResponse, BulkUpdateRequest, BulkUpdateResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_permission, has_role
+    has_permission
 )
 from config.database import get_db
 

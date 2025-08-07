@@ -1,7 +1,7 @@
 # routes/api/v0/orders.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 import uuid
 
 from app.Http.Controllers.OrderController import OrderController
@@ -10,7 +10,7 @@ from app.Schemas.order import (
     OrderResponse, OrderListResponse, OrderStatsResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_permission, has_role
+    has_permission
 )
 from config.database import get_db
 

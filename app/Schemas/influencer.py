@@ -1,5 +1,5 @@
 # app/Schemas/influencer.py
-from pydantic import BaseModel,ConfigDict, validator, Field
+from pydantic import BaseModel,ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid

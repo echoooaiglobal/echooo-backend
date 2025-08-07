@@ -1,16 +1,15 @@
 # app/Http/Controllers/SystemSettingsController.py
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_
 from typing import List, Optional, Dict, Any
 import uuid
-import json
 from datetime import datetime
 
 from app.Models.system_settings import Settings
 from app.Schemas.system_settings import (
     SettingsCreate, SettingsUpdate, SettingsResponse, 
-    SettingsBulkUpdate, SettingsFilterResponse
+    SettingsBulkUpdate
 )
 from app.Utils.Logger import logger
 
@@ -478,7 +477,6 @@ class SystemSettingsController:
     async def reset_to_defaults(
         platform_id: Optional[uuid.UUID],
         table_name: Optional[str],
-        reset_by: uuid.UUID,
         db: Session
     ) -> Dict[str, Any]:
         """Reset settings to default values"""
@@ -515,9 +513,11 @@ class SystemSettingsController:
         db: Session,
         platform_id: Optional[uuid.UUID] = None,
         applies_to_table: Optional[str] = None,
-        format: str = "json"
+        export_format: str = "json"
     ) -> Dict[str, Any]:
         """Export settings as JSON"""
+        # TODO: Implement support for other export formats besides JSON
+        _ = export_format  # Currently only JSON is supported
         try:
             query = db.query(Settings)
             

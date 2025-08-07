@@ -1,8 +1,7 @@
 # routes/api/v0/agent_assignments.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
-import uuid 
+from typing import Optional
 
 from app.Http.Controllers.AgentAssignmentController import AgentAssignmentController
 from app.Models.auth_models import User
@@ -12,7 +11,7 @@ from app.Schemas.agent_assignment import (
     AgentAssignmentStatusUpdate, AgentAssignmentCountsUpdate
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_permission
 )
 from config.database import get_db
 

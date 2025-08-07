@@ -1,5 +1,5 @@
 # routes/api/v0/influencer_outreach.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -13,7 +13,7 @@ from app.Schemas.influencer_outreach import (
     InfluencerOutreachStats
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 
@@ -234,7 +234,6 @@ async def get_my_outreach_statistics(
     db: Session = Depends(get_db)
 ):
     """Get outreach statistics for the current user's agent"""
-    from datetime import timedelta
     
     # This would need additional logic to find the user's agent
     # For now, return default statistics

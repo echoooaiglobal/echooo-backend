@@ -1,5 +1,5 @@
 # routes/api/v0/categories.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -7,10 +7,10 @@ import uuid
 from app.Http.Controllers.CategoryController import CategoryController
 from app.Models.auth_models import User
 from app.Schemas.category import (
-    CategoryCreate, CategoryUpdate, CategoryResponse, CategoryWithSubsResponse
+    CategoryCreate, CategoryUpdate, CategoryResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role
 )
 from config.database import get_db
 

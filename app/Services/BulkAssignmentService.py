@@ -1,7 +1,7 @@
 # app/Services/BulkAssignmentService.py
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 from typing import List, Dict, Any, Optional, Tuple
 import uuid
