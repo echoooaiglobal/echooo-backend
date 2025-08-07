@@ -9,7 +9,7 @@ from app.Models.auth_models import User
 from app.Schemas.auth import (
     UserCreate, UserResponse, TokenResponse, RefreshTokenRequest, 
     LogoutRequest, UserUpdate, PasswordResetRequest, PasswordReset, UserDetailResponse,
-    EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
+    EmailVerificationToken, EmailVerificationResponse,
     ResendVerificationRequest, ManualVerificationRequest,
     PasswordUpdate, PasswordUpdateResponse
 )
@@ -90,7 +90,6 @@ async def update_profile(
     last_name: Optional[str] = Form(None),
     full_name: Optional[str] = Form(None),
     phone_number: Optional[str] = Form(None),
-    language: Optional[str] = Form(None),  # Add this if you need it
     # File upload
     profile_image: Optional[UploadFile] = File(None),
     # Keep current user and db

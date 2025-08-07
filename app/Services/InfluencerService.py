@@ -1,7 +1,7 @@
 # app/Services/InfluencerService.py
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional, Dict, Any
+from typing import Dict, Any
 from fastapi import HTTPException, status
 import uuid
 

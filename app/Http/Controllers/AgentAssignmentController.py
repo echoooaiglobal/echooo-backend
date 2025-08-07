@@ -1,5 +1,5 @@
 # app/Http/Controllers/AgentAssignmentController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict, Any, Optional, Tuple
 import uuid
@@ -10,7 +10,7 @@ from app.Models.auth_models import User
 from app.Models.agent_assignments import AgentAssignment
 from app.Schemas.agent_assignment import (
     AgentAssignmentResponse, AgentAssignmentsPaginatedResponse,
-    AgentAssignmentStatsResponse, OutreachAgentBrief, CampaignListBrief, StatusBrief, CampaignBrief
+    AgentAssignmentStatsResponse, CampaignListBrief, StatusBrief, CampaignBrief
 )
 from app.Schemas.common import PaginationInfo
 from app.Models.outreach_agents import OutreachAgent
@@ -810,7 +810,6 @@ class AgentAssignmentController:
     async def complete_influencer_outreach(
         assignment_id: str,
         influencer_id: str,
-        completion_notes: Optional[str] = None,
         current_user: User = None,
         db: Session = None
     ) -> AgentAssignmentResponse:

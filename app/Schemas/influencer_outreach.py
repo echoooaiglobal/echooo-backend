@@ -1,6 +1,6 @@
 # app/Schemas/influencer_outreach.py
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
 import uuid
 

@@ -1,7 +1,6 @@
 # routes/api/v0/influencers.py
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 import uuid
 
 from app.Http.Controllers.InfluencerController import InfluencerController
@@ -12,7 +11,7 @@ from app.Schemas.influencer import (
     InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission, is_influencer
+    has_permission, is_influencer
 )
 from config.database import get_db
 

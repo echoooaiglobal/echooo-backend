@@ -1,7 +1,7 @@
 # app/Http/Controllers/OrderController.py
 from fastapi import HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 import uuid
 import hmac
 import hashlib
@@ -9,7 +9,7 @@ import json
 
 from app.Services.OrderService import OrderService
 from app.Schemas.order import (
-    OrderCreate, OrderUpdate, OrderResponse, OrderListResponse,
+    OrderResponse, OrderListResponse,
     ShopifyWebhookOrder, OrderStatsResponse
 )
 from app.Utils.Logger import logger

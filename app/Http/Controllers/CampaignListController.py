@@ -1,11 +1,8 @@
 # app/Http/Controllers/CampaignListController.py - Fixed imports
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import uuid
 
 from app.Models.auth_models import User
-from app.Models.campaign_lists import CampaignList
 from app.Schemas.campaign_lists import (  # Fixed import
     CampaignListCreate, CampaignListUpdate, CampaignListResponse
 )

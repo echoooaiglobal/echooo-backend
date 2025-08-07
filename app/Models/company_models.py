@@ -1,6 +1,6 @@
 # app/Models/company_models.py
 import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, Text, func, UniqueConstraint, Index
+from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, func, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.Models.base import Base

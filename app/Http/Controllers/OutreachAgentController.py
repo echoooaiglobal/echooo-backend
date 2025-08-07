@@ -1,10 +1,8 @@
 # app/Http/Controllers/OutreachAgentController.py
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import Optional
 import uuid
 import math
-from app.Models.auth_models import User
 from app.Schemas.outreach_agent import (
     OutreachAgentCreate, OutreachAgentUpdate, OutreachAgentResponse,
     UserBrief, StatusBrief, AgentSocialConnectionBrief, AgentListAssignmentBrief,

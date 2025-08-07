@@ -1,7 +1,7 @@
 # config/settings.py
 import os
 from dotenv import load_dotenv
-from typing import Optional, Dict, Any, List
+from typing import Optional, List
 import secrets
 
 # Load environment variables

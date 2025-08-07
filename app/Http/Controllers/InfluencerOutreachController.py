@@ -1,7 +1,6 @@
 # app/Http/Controllers/InfluencerOutreachController.py
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import uuid
 import math
 from datetime import datetime

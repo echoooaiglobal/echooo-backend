@@ -1,5 +1,5 @@
 # app/Http/Controllers/AgentSocialConnectionController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -17,14 +17,14 @@ from app.Services.AgentSocialConnectionService import AgentSocialConnectionServi
 from app.Services.InstagramIntegrationService import InstagramIntegrationService
 from app.Schemas.agent_social_connection import (
     AgentSocialConnectionCreate, AgentSocialConnectionUpdate,
-    AgentSocialConnectionResponse, AgentSocialConnectionDetailResponse,
+    AgentSocialConnectionDetailResponse,
     AgentSocialConnectionsPaginatedResponse, UserPlatformConnectionsStatus,
     TokenValidationRequest, TokenValidationResponse,
     AutomationToggleRequest, AutomationStatusResponse,
-    ConnectionHealthCheck, SystemHealthReport,
+    SystemHealthReport,
     BulkConnectionUpdate, BulkOperationResponse,
     PlatformConnectionRequest, PlatformConnectionInitiateRequest,
-    OAuthInitiateResponse, OAuthCallbackResponse, OAuthStatusResponse
+    OAuthInitiateResponse, OAuthStatusResponse
 )
 from app.Utils.Logger import logger
 from config.settings import settings

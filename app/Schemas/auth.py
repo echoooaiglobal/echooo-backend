@@ -1,5 +1,5 @@
 # app/Schemas/auth.py - Updated with first_name and last_name fields
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, validator, root_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 import uuid
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -11,7 +11,7 @@ PYDANTIC_V2 = version.parse(pydantic.__version__) >= version.parse("2.0.0")
 if PYDANTIC_V2:
     from pydantic import field_validator
 else:
-    from pydantic import validator
+    pass
 
 class TokenData(BaseModel):
     email: Optional[str] = None   

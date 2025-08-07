@@ -1,6 +1,5 @@
 # app/Http/Controllers/InstagramController.py
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy import desc
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.Services.Instagram.LoginService import LoginService
 from app.Services.Instagram.DMService import DMService
@@ -10,8 +9,6 @@ from app.Services.Instagram.HighlightMessagingService import HighlightMessagingS
 from app.Services.Instagram.HumanSimulationService import HumanSimulationService
 from config.settings import settings
 from config.database import SessionLocal
-# from app.Models.influencer_models import Influencer
-from typing import List, Optional, Dict, Any
 import random
 import asyncio
 import datetime

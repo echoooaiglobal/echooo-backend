@@ -1,7 +1,7 @@
 # routes/api/v0/campaign_lists.py - Fixed imports
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Query
+from fastapi import APIRouter, Depends, Body, Query
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 import uuid
 
 from app.Http.Controllers.CampaignListController import CampaignListController
@@ -11,7 +11,7 @@ from app.Schemas.campaign_lists import (  # Fixed import
 )
 
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_permission
 )
 from config.database import get_db
 

@@ -1,5 +1,5 @@
 # app/Schemas/campaign_lists.py
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid

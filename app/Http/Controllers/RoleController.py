@@ -2,8 +2,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import func
-from typing import List, Dict, Any
 import uuid
 
 from app.Models.auth_models import Role, Permission, RolePermission

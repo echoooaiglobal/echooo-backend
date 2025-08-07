@@ -1,11 +1,9 @@
 # app/Http/Controllers/CategoryController.py
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import uuid
 
 from app.Schemas.category import (
-    CategoryCreate, CategoryUpdate, CategoryResponse, CategoryWithSubsResponse
+    CategoryCreate, CategoryUpdate, CategoryResponse
 )
 from app.Services.CategoryService import CategoryService
 from app.Utils.Logger import logger

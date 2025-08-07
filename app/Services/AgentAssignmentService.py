@@ -1,11 +1,10 @@
 # app/Services/AgentAssignmentService.py
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, func, desc, asc
+from sqlalchemy import and_, func, desc
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import HTTPException, status
 import uuid
-import math
 
 from app.Models.agent_assignments import AgentAssignment
 from app.Models.outreach_agents import OutreachAgent
@@ -14,7 +13,6 @@ from app.Models.statuses import Status
 from app.Utils.Logger import logger
 from app.Models.influencer_outreach import InfluencerOutreach
 from app.Services.InfluencerOutreachService import InfluencerOutreachService
-from app.Models.message_templates import MessageTemplate
 from app.Models.campaigns import Campaign
 
 class AgentAssignmentService:

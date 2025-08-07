@@ -1,13 +1,11 @@
 # app/Services/InstagramIntegrationService.py
 import httpx
-import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.Models.agent_social_connections import AgentSocialConnection
-from app.Models.auth_models import User
 from app.Services.OAuthService import OAuthService
 from app.Utils.Logger import logger
 from app.Utils.encryption import decrypt_token

@@ -3,27 +3,24 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List, Optional
-from jose import JWTError, jwt
+from typing import Optional
+from jose import jwt
 from passlib.context import CryptContext
 import uuid
 
 from app.Services.EmailVerificationService import EmailVerificationService
 from app.Schemas.auth import (
-    UserCreate, UserResponse, TokenResponse, TokenData, 
-    LoginResponse, RoleResponse, PasswordResetRequest, 
-    PasswordReset, UserUpdate, CompanyBriefResponse, UserDetailResponse,
-    EmailVerificationRequest, EmailVerificationToken, EmailVerificationResponse,
+    UserCreate, UserResponse, TokenResponse, LoginResponse, RoleResponse, PasswordResetRequest, 
+    PasswordReset, CompanyBriefResponse, UserDetailResponse,
+    EmailVerificationToken, EmailVerificationResponse,
     ResendVerificationRequest, ManualVerificationRequest,
-    PasswordUpdate, PasswordUpdateResponse
+    PasswordUpdate
 )
-from app.Schemas.company import CompanyCreate
 from app.Models.auth_models import User, Role, RefreshToken, UserStatus
 from app.Models.company_models import Company, CompanyUser
 from app.Services.InfluencerService import InfluencerService
 from config.database import get_db
 from app.Utils.Helpers import get_current_user, get_current_active_user
-from app.Utils.Logger import logger
 from config.settings import settings
 from app.Services.CompanyService import CompanyService
 from app.Services.GoogleCloudStorageService import gcs_service
@@ -436,7 +433,6 @@ class AuthController:
         # Send password reset email (background task)
         # background_tasks.add_task(send_password_reset_email, user.email, reset_token)
         return { "token": reset_token, "message": "If your email is registered, you will receive a password reset link" }
-        return {"message": "If your email is registered, you will receive a password reset link"}
     
     @staticmethod
     async def reset_password(reset_data: PasswordReset, db: Session = Depends(get_db)):

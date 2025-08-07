@@ -1,10 +1,8 @@
 # app/Http/Controllers/InfluencerContactController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import Optional
 import uuid
-
-from app.Models.auth_models import User
 from app.Schemas.influencer_contact import (
     InfluencerContactCreate, InfluencerContactUpdate, InfluencerContactResponse,
     SocialAccountBrief, PlatformBrief, RoleBrief,

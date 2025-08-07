@@ -1,10 +1,6 @@
 # app/Http/Controllers/StatusController.py
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import uuid
-
-from app.Models.auth_models import User
 from app.Schemas.campaign import (
     StatusCreate, StatusUpdate, StatusResponse
 )

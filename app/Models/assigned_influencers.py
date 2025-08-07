@@ -1,7 +1,7 @@
 # app/Models/assigned_influencers.py
 
 import uuid
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime, Enum, func, Index
+from sqlalchemy import Column, Text, Integer, ForeignKey, DateTime, Enum, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.Models.base import Base

@@ -6,7 +6,7 @@ from typing import Optional
 from app.Http.Controllers.OAuthController import OAuthController
 from app.Models.auth_models import User
 from app.Schemas.oauth_schemas import (
-    OAuthAuthorizationRequest, OAuthAuthorizationResponse,
+    OAuthAuthorizationResponse,
     OAuthCallbackResponse, LinkedAccountsResponse, UnlinkAccountResponse,
     OAuthProvidersResponse, OAuthSuccessResponse
 )

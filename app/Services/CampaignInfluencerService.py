@@ -1,6 +1,6 @@
 # app/Services/CampaignInfluencerService.py
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import HTTPException, status
 import uuid
@@ -9,7 +9,6 @@ from app.Models.campaign_influencers import CampaignInfluencer
 from app.Models.assigned_influencers import AssignedInfluencer
 from app.Models.campaign_lists import CampaignList
 from app.Models.statuses import Status
-from app.Models.influencers import Influencer
 from app.Models.social_accounts import SocialAccount
 from app.Models.platforms import Platform
 from app.Utils.Logger import logger

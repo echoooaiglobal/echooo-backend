@@ -1,14 +1,13 @@
 # app/Http/Controllers/CampaignInfluencerController.py
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import uuid
 import math
-from app.Models.auth_models import User
 from app.Schemas.campaign_influencer import (
-    CampaignInfluencerCreate, CampaignInfluencerUpdate, CampaignInfluencerResponse,
+    CampaignInfluencerUpdate, CampaignInfluencerResponse,
     SocialAccountBrief, StatusBrief,
-    CampaignInfluencerBulkCreate, CampaignInfluencersPaginatedResponse, PaginationInfo, CampaignInfluencerPriceUpdate
+    CampaignInfluencersPaginatedResponse, PaginationInfo, CampaignInfluencerPriceUpdate
 )
 from app.Models.assigned_influencers import AssignedInfluencer
 from app.Models.influencer_outreach import InfluencerOutreach

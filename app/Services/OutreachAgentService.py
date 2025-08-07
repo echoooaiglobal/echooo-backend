@@ -1,15 +1,14 @@
 # app/Services/OutreachAgentService.py
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import func, and_
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import HTTPException, status
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.Models.outreach_agents import OutreachAgent
 from app.Models.agent_assignments import AgentAssignment
 from app.Models.agent_social_connections import AgentSocialConnection
-from app.Models.automation_sessions import AutomationSession
 from app.Models.auth_models import User
 from app.Models.statuses import Status
 from app.Utils.Logger import logger

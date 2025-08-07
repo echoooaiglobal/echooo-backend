@@ -1,8 +1,7 @@
 # routes/api/v0/bulk_assignments.py
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
 import uuid
 from app.Services.CounterSyncService import CounterSyncService
 from app.Http.Controllers.BulkAssignmentController import BulkAssignmentController
@@ -12,7 +11,7 @@ from app.Schemas.bulk_assignment import (
     BulkAssignmentValidationResponse, ReassignmentRequest, ReassignmentResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_permission
 )
 from config.database import get_db
 

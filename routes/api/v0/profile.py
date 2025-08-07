@@ -1,14 +1,9 @@
 # routes/api/v0/profile.py
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-from typing import Optional
-import uuid
-
-from app.Http.Controllers.UserController import UserController
 from app.Models.auth_models import User
 from app.Schemas.auth import (
-    UserProfileUpdate, UserDetailResponse, 
-    ProfileImageResponse, ProfileImageUpdate
+    ProfileImageResponse
 )
 from app.Services.GoogleCloudStorageService import gcs_service
 from app.Utils.Helpers import get_current_active_user

@@ -1,5 +1,5 @@
 # app/Utils/social_media_errors.py
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from fastapi import HTTPException, status
 
 class SocialMediaError(Exception):

@@ -2,7 +2,6 @@
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
 import uuid
 
 from app.Models.outreach_agents import OutreachAgent

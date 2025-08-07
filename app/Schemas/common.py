@@ -2,7 +2,6 @@
 # This will contain reusable schemas across the application
 
 from pydantic import BaseModel
-from typing import Optional
 
 class PaginationInfo(BaseModel):
     """Reusable pagination information schema"""

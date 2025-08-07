@@ -1,15 +1,13 @@
 # app/Http/Controllers/ResultController.py
 
-from fastapi import HTTPException, status, Depends, Query
+from fastapi import HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List
 from math import ceil
 import uuid
-
-from app.Models.auth_models import User
 from app.Schemas.results import (
     ResultCreate, ResultUpdate, ResultResponse, ResultListResponse,
-    CampaignResultsResponse, ResultBrief, BulkUpdateRequest
+    CampaignResultsResponse, BulkUpdateRequest
 )
 from app.Services.ResultService import ResultService
 from app.Utils.Logger import logger

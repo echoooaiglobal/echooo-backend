@@ -1,11 +1,8 @@
 # app/Http/Controllers/CompanyController.py
-from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import uuid
 
 from app.Models.auth_models import User
-from app.Models.company_models import Company, CompanyUser, CompanyContact
 from app.Schemas.company import (
     CompanyCreate, CompanyUpdate, CompanyResponse,
     CompanyUserCreate, CompanyUserUpdate, CompanyUserResponse,

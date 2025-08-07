@@ -1,15 +1,14 @@
 # routes/api/v0/system_settings.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
 
 from app.Http.Controllers.SystemSettingsController import SystemSettingsController
 from app.Models.auth_models import User
-from app.Models.system_settings import Settings
 from app.Schemas.system_settings import (
     SettingsCreate, SettingsUpdate, SettingsResponse, 
-    SettingsBulkUpdate, SettingsFilterResponse
+    SettingsBulkUpdate
 )
 from app.Utils.Helpers import (
     get_current_active_user, has_role, has_permission

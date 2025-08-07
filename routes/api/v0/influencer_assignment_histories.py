@@ -1,7 +1,7 @@
 # routes/api/v0/influencer_assignment_histories.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from datetime import datetime
 import uuid
 
@@ -16,7 +16,7 @@ from app.Schemas.influencer_assignment_history import (
     ReassignmentReasonCreate, ReassignmentReasonUpdate, ReassignmentReasonResponse
 )
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 
@@ -328,7 +328,12 @@ async def advanced_search_assignment_histories(
     db: Session = Depends(get_db)
 ):
     """Advanced search for assignment histories with multiple filters"""
-    # This would implement more complex filtering logic
+    # TODO: Implement complex filtering logic for all parameters
+    # Currently unused parameters (to be implemented):
+    _ = (campaign_influencer_ids, agent_assignment_ids, from_agent_ids, 
+         to_agent_ids, reassignment_reason_ids, triggered_by_list, 
+         min_attempts, max_attempts)
+    
     # For now, fall back to the basic search
     return await InfluencerAssignmentHistoryController.get_assignment_histories(
         db=db,

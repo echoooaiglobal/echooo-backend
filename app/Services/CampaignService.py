@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import HTTPException, status
 from app.Models.campaigns import Campaign
 from app.Models.campaign_lists import CampaignList

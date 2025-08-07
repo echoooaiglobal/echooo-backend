@@ -1,6 +1,6 @@
 # app/Models/profile_analytics.py
 import uuid
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, DateTime, Text, UniqueConstraint, func
+from sqlalchemy import Column, ForeignKey, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 

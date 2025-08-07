@@ -1,18 +1,15 @@
 # app/Services/MessageTemplateService.py
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import HTTPException, status
 import uuid
 
 from app.Models.campaigns import Campaign
-from app.Models.agent_assignments import AgentAssignment
 from app.Models.campaign_lists import CampaignList
-from app.Models.outreach_agents import OutreachAgent
 from app.Models.message_templates import MessageTemplate
 from app.Models.company_models import Company
 from app.Utils.Logger import logger
-from app.Models.statuses import Status
 
 class MessageTemplateService:
     """Service for managing message templates"""

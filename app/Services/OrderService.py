@@ -1,7 +1,7 @@
 # app/Services/OrderService.py
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import and_, desc, asc, func
+from sqlalchemy import desc, asc, func
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
@@ -9,7 +9,7 @@ from decimal import Decimal
 import uuid
 
 from app.Models.order_models import Order, OrderItem
-from app.Schemas.order import OrderCreate, OrderUpdate, ShopifyWebhookOrder, OrderItemCreate
+from app.Schemas.order import ShopifyWebhookOrder
 from app.Utils.Logger import logger
 
 class OrderService:

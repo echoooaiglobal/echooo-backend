@@ -1,7 +1,7 @@
 # routes/api/v0/outreach_agents.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 import uuid
 
 from app.Http.Controllers.OutreachAgentController import OutreachAgentController
@@ -13,7 +13,7 @@ from app.Schemas.outreach_agent import (
 )
 
 from app.Utils.Helpers import (
-    get_current_active_user, has_role, has_permission
+    has_role, has_permission
 )
 from config.database import get_db
 
