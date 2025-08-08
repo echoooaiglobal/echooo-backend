@@ -14,6 +14,10 @@ from app.Models.company_models import Company
 from app.Utils.Logger import logger
 from app.Models.statuses import Status
 
+# Import our professional AI service
+from app.Services.ThirdParty.services.ai_content_service import AIContentService, AIProvider
+from app.Services.ThirdParty.exceptions import ThirdPartyAPIError
+
 class MessageTemplateService:
     """Service for managing message templates"""
 
@@ -79,99 +83,246 @@ class MessageTemplateService:
         ).all()
     
     @staticmethod
-    async def get_template_by_id(template_id: uuid.UUID, db: Session):
-        """
-        Get a message template by ID
-        
-        Args:
-            template_id: ID of the message template
-            db: Database session
+    async def get_template_by_id(template_id: uuid.UUID, db: Session) -> MessageTemplate:
+        """Get template by ID with followups"""
+        try:
+            template = db.query(MessageTemplate).filter(
+                MessageTemplate.id == template_id,
+                MessageTemplate.is_deleted == False
+            ).first()
             
-        Returns:
-            MessageTemplate: The message template if found
-        """
-        template = db.query(MessageTemplate).filter(MessageTemplate.id == template_id).first()
-        
-        if not template:
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Message template not found"
+                )
+            
+            return template
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching template {template_id}: {str(e)}")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Message template not found"
-            )
-            
-        return template
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error fetching message template"
+            ) from e
     
     @staticmethod
-    async def create_template(template_data: Dict[str, Any], created_by: uuid.UUID, db: Session):
+    async def get_campaign_templates_with_followups(campaign_id: uuid.UUID, db: Session) -> List[MessageTemplate]:
+        """Get all templates for a campaign including followups"""
+        try:
+            # Get only initial templates (followups will be loaded via relationship)
+            templates = db.query(MessageTemplate).filter(
+                MessageTemplate.campaign_id == campaign_id,
+                MessageTemplate.template_type == "initial",
+                MessageTemplate.is_deleted == False
+            ).all()
+            
+            return templates
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching templates for campaign {campaign_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error fetching campaign templates"
+            ) from e
+
+    @staticmethod
+    async def regenerate_followups(
+        template_id: uuid.UUID,
+        db: Session,
+        ai_provider: str = "openai",
+        custom_instructions: Optional[str] = None
+    ) -> List[MessageTemplate]:
+        """Regenerate followups for an existing template"""
+        try:
+            # Get main template
+            main_template = await MessageTemplateService.get_template_by_id(template_id, db)
+            
+            if main_template.template_type != "initial":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Can only regenerate followups for initial templates"
+                )
+            
+            # Delete existing followups
+            existing_followups = db.query(MessageTemplate).filter(
+                MessageTemplate.parent_template_id == template_id,
+                MessageTemplate.is_deleted == False
+            ).all()
+            
+            for followup in existing_followups:
+                followup.is_deleted = True
+            
+            db.commit()
+            
+            # Generate new followups
+            ai_service = AIContentService()
+            
+            followup_templates = await ai_service.generate_followup_messages(
+                original_subject=main_template.subject or "Collaboration Opportunity",
+                original_message=main_template.content,
+                provider=ai_provider,
+                count=5,
+                custom_instructions=custom_instructions
+            )
+            
+            # Save new followups
+            created_followups = []
+            for i, followup in enumerate(followup_templates, 1):
+                followup_data = {
+                    "content": followup["content"],
+                    "subject": followup.get("subject"),
+                    "company_id": str(main_template.company_id),
+                    "campaign_id": str(main_template.campaign_id),
+                    "template_type": "followup",
+                    "parent_template_id": str(main_template.id),
+                    "followup_sequence": i,
+                    "followup_delay_hours": followup["delay_hours"],
+                    "is_global": main_template.is_global
+                }
+                
+                # Get user from main template
+                followup_template = await MessageTemplateService.create_template(
+                    followup_data, main_template.creator, db
+                )
+                created_followups.append(followup_template)
+            
+            logger.info(f"✅ Regenerated {len(created_followups)} followup templates")
+            return created_followups
+            
+        except ThirdPartyAPIError as e:
+            logger.error(f"AI service error regenerating followups: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"AI service error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Error regenerating followups: {str(e)}")
+            raise
+    
+    @staticmethod
+    async def create_template_with_followups(
+        template_data: Dict[str, Any],
+        user,
+        db: Session,
+        generate_followups: bool = True,
+        ai_provider: str = "openai",
+        custom_instructions: Optional[str] = None
+    ) -> MessageTemplate:
         """
-        Create a new message template
+        Create a message template with AI-generated followups
         
         Args:
             template_data: Template data dictionary
-            created_by: ID of the user creating the template
+            user: Current user
             db: Database session
+            generate_followups: Whether to generate followups
+            ai_provider: AI provider to use ("openai", "gemini")
+            custom_instructions: Additional instructions for AI
             
         Returns:
-            MessageTemplate: The created message template object
+            Created main template with followups attached
         """
+        
         try:
-            # Set creator
-            template_data['created_by'] = created_by
+            # Step 1: Create the main template
+            main_template = await MessageTemplateService.create_template(template_data, user, db)
             
-            # Verify company exists
-            company_id = template_data.get('company_id')
-            if company_id:
-                company = db.query(Company).filter(Company.id == company_id).first()
-                if not company:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Company not found"
+            # Step 2: Generate followups if requested and it's an initial template
+            if (generate_followups and 
+                template_data.get("template_type", "initial") == "initial"):
+                
+                try:
+                    logger.info(f"Generating followups using {ai_provider} for template {main_template.id}")
+                    
+                    # Use our professional AI service
+                    ai_service = AIContentService()
+                    
+                    followup_templates = await ai_service.generate_followup_messages(
+                        original_subject=template_data.get("subject", "Collaboration Opportunity"),
+                        original_message=template_data["content"],
+                        provider=ai_provider,
+                        count=5,
+                        custom_instructions=custom_instructions
                     )
+                    
+                    # Step 3: Save followup templates to database
+                    created_followups = []
+                    for i, followup in enumerate(followup_templates, 1):
+                        followup_data = {
+                            "content": followup["content"],
+                            "subject": followup.get("subject"),
+                            "company_id": template_data["company_id"],
+                            "campaign_id": template_data["campaign_id"], 
+                            "template_type": "followup",
+                            "parent_template_id": str(main_template.id),
+                            "followup_sequence": i,
+                            "followup_delay_hours": followup["delay_hours"],
+                            "is_global": template_data.get("is_global", True)
+                        }
+                        
+                        followup_template = await MessageTemplateService.create_template(
+                            followup_data, user, db
+                        )
+                        created_followups.append(followup_template)
+                    
+                    logger.info(f"✅ Created {len(created_followups)} followup templates")
+                    
+                    # Attach followups to main template for response
+                    main_template.followup_templates = created_followups
+                    
+                except ThirdPartyAPIError as ai_error:
+                    # Log AI error but don't fail the entire operation
+                    logger.warning(f"AI followup generation failed: {str(ai_error)}")
+                    logger.warning("Continuing without followups...")
+                    
+                except Exception as e:
+                    # Log unexpected errors but don't fail main template creation
+                    logger.error(f"Unexpected error during followup generation: {str(e)}")
+                    logger.warning("Continuing without followups...")
             
-            # Verify campaign exists
-            campaign_id = template_data.get('campaign_id')
-            if campaign_id:
-                campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
-                if not campaign:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Campaign not found"
-                    )
+            return main_template
             
-            # Validate parent template exists for follow-ups
-            parent_template_id = template_data.get('parent_template_id')
-            if parent_template_id:
-                parent_template = db.query(MessageTemplate).filter(
-                    MessageTemplate.id == parent_template_id
-                ).first()
-                if not parent_template:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Parent template not found"
-                    )
+        except Exception as e:
+            logger.error(f"Error in create_template_with_followups: {str(e)}")
+            raise
+
+    @staticmethod
+    async def create_template(template_data: Dict[str, Any], user, db: Session) -> MessageTemplate:
+        """Create a single message template"""
+        try:
+            # Convert string IDs to UUIDs if needed
+            if isinstance(template_data.get("company_id"), str):
+                template_data["company_id"] = uuid.UUID(template_data["company_id"])
+            if isinstance(template_data.get("campaign_id"), str):
+                template_data["campaign_id"] = uuid.UUID(template_data["campaign_id"])
+            if isinstance(template_data.get("parent_template_id"), str):
+                template_data["parent_template_id"] = uuid.UUID(template_data["parent_template_id"])
             
-            # Create the message template
-            new_template = MessageTemplate(**template_data)
-            db.add(new_template)
+            # Create template
+            template = MessageTemplate(
+                subject=template_data.get("subject"),
+                content=template_data["content"],
+                company_id=template_data["company_id"],
+                campaign_id=template_data["campaign_id"],
+                template_type=template_data.get("template_type", "initial"),
+                parent_template_id=template_data.get("parent_template_id"),
+                followup_sequence=template_data.get("followup_sequence"),
+                followup_delay_hours=template_data.get("followup_delay_hours"),
+                is_global=template_data.get("is_global", True),
+                created_by=user.id
+            )
+            
+            db.add(template)
             db.commit()
-            db.refresh(new_template)
+            db.refresh(template)
             
-            logger.info(f"Message template created successfully: {new_template.id}")
-            return new_template
+            logger.info(f"Created template: {template.id} ({template.template_type})")
+            return template
             
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error(f"Database error creating message template: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error creating message template"
-            ) from e
-        except HTTPException:
-            # Re-raise HTTP exceptions (like 404 for company/campaign not found)
-            db.rollback()
-            raise
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Unexpected error creating message template: {str(e)}")
+            logger.error(f"Database error creating template: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error creating message template"

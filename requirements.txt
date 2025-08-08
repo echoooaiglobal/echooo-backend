@@ -24,3 +24,12 @@ asyncio-cron==0.1.2          # Async cron support (optional)
 cryptography>=41.0.0
 google-cloud-storage
 pillow
+
+aiohttp>=3.8.0                    # Async HTTP client for API calls
+openai>=1.3.0                     # OpenAI GPT API client
+google-generativeai>=0.3.0        # Google Gemini API client
+anthropic>=0.7.0                  # Anthropic Claude API client (future)
+tenacity>=8.2.0                   # Retry logic with exponential backoff
+pydantic-settings>=2.0.0          # Enhanced Pydantic settings management
+cachetools>=5.3.0                 # Caching for API responses
+redis>=4.5.0                      # Redis for distributed caching (optional)

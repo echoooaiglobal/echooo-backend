@@ -1,7 +1,7 @@
 # config/settings.py
 import os
 from dotenv import load_dotenv
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, ClassVar
 import secrets
 
 # Load environment variables
@@ -115,6 +115,76 @@ class Settings(BaseSettings):
     UPLOAD_DIRECTORY: str = os.getenv("UPLOAD_DIRECTORY", "uploads")
     MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))  # 10MB for other files
 
+    # ========================================
+    # NEW: Third-party AI API settings
+    # ========================================
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_DEFAULT_MODEL: str = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4")
+    OPENAI_TIMEOUT: int = int(os.getenv("OPENAI_TIMEOUT", "30"))
+    OPENAI_MAX_RETRIES: int = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+    OPENAI_RATE_LIMIT_RPM: int = int(os.getenv("OPENAI_RATE_LIMIT_RPM", "3500"))
+    OPENAI_MAX_TOKENS: int = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
+    
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
+    GEMINI_BASE_URL: str = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1")
+    GEMINI_DEFAULT_MODEL: str = os.getenv("GEMINI_DEFAULT_MODEL", "gemini-pro")
+    GEMINI_TIMEOUT: int = int(os.getenv("GEMINI_TIMEOUT", "30"))
+    GEMINI_MAX_RETRIES: int = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
+    GEMINI_RATE_LIMIT_RPM: int = int(os.getenv("GEMINI_RATE_LIMIT_RPM", "60"))
+    
+    # Global AI settings
+    DEFAULT_AI_PROVIDER: str = os.getenv("DEFAULT_AI_PROVIDER", "openai")
+    ENABLE_AI_CONTENT_GENERATION: bool = os.getenv("ENABLE_AI_CONTENT_GENERATION", "true").lower() == "true"
+    AI_CONTENT_CACHE_TTL: int = int(os.getenv("AI_CONTENT_CACHE_TTL", "3600"))
+    MAX_FOLLOWUP_COUNT: int = int(os.getenv("MAX_FOLLOWUP_COUNT", "5"))
+
+    # Use ClassVar for configuration dictionaries (not Pydantic fields)
+    THIRD_PARTY_APIS: ClassVar[Dict[str, Any]] = {
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+        "OPENAI_BASE_URL": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        "OPENAI_DEFAULT_MODEL": os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4"),
+        "OPENAI_TIMEOUT": int(os.getenv("OPENAI_TIMEOUT", "30")),
+        "OPENAI_MAX_RETRIES": int(os.getenv("OPENAI_MAX_RETRIES", "3")),
+        
+        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
+        "GEMINI_BASE_URL": os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1"),
+        "GEMINI_DEFAULT_MODEL": os.getenv("GEMINI_DEFAULT_MODEL", "gemini-pro"),
+        "GEMINI_TIMEOUT": int(os.getenv("GEMINI_TIMEOUT", "30")),
+        
+        "DEFAULT_AI_PROVIDER": os.getenv("DEFAULT_AI_PROVIDER", "openai"),
+        "ENABLE_AI_CONTENT_GENERATION": os.getenv("ENABLE_AI_CONTENT_GENERATION", "true").lower() == "true",
+        "AI_CONTENT_CACHE_TTL": int(os.getenv("AI_CONTENT_CACHE_TTL", "3600")),
+        "MAX_FOLLOWUP_COUNT": int(os.getenv("MAX_FOLLOWUP_COUNT", "5")),
+    }
+
+    # Logging configuration (use ClassVar as it's not a Pydantic field)
+    THIRD_PARTY_LOGGING: ClassVar[Dict[str, Any]] = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "detailed": {
+                "format": "{levelname} {asctime} {name} {process} {thread} {message}",
+                "style": "{",
+            },
+        },
+        "handlers": {
+            "third_party_file": {
+                "level": "INFO",
+                "class": "logging.FileHandler",
+                "filename": "logs/third_party_apis.log",
+                "formatter": "detailed",
+            },
+        },
+        "loggers": {
+            "app.Services.ThirdParty": {
+                "handlers": ["third_party_file"],
+                "level": "INFO",
+                "propagate": True,
+            },
+        },
+    }
+
     def get_bucket_name(self) -> str:
         """Get bucket name based on environment"""
         if self.ENVIRONMENT == "production":
@@ -177,6 +247,18 @@ class Settings(BaseSettings):
                 if not os.getenv("GOOGLE_CLOUD_PROJECT"):
                     print(f"Warning: GCS service account file not found: {v}")
             return v
+
+        # NEW: AI API validation for Pydantic v2
+        @field_validator('OPENAI_API_KEY', 'GEMINI_API_KEY')
+        @classmethod
+        def validate_ai_keys(cls, v, info):
+            field_name = info.field_name
+            if field_name == 'OPENAI_API_KEY' and not v:
+                print(f"Warning: {field_name} is not set. OpenAI features will not work.")
+            elif field_name == 'GEMINI_API_KEY' and not v:
+                print(f"Info: {field_name} is not set. Gemini features will not be available (optional).")
+            return v
+            
     else:
         @validator("BACKEND_CORS_ORIGINS", pre=True)
         def assemble_cors_origins(cls, v):
@@ -198,6 +280,15 @@ class Settings(BaseSettings):
             if v and not os.path.exists(v):
                 if not os.getenv("GOOGLE_CLOUD_PROJECT"):
                     print(f"Warning: GCS service account file not found: {v}")
+            return v
+
+        # NEW: AI API validation for Pydantic v1
+        @validator('OPENAI_API_KEY', 'GEMINI_API_KEY')
+        def validate_ai_keys(cls, v, field):
+            if field.name == 'OPENAI_API_KEY' and not v:
+                print(f"Warning: {field.name} is not set. OpenAI features will not work.")
+            elif field.name == 'GEMINI_API_KEY' and not v:
+                print(f"Info: {field.name} is not set. Gemini features will not be available (optional).")
             return v
 
 # Create settings instance

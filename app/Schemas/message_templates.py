@@ -101,3 +101,83 @@ class MessageTemplateResponse(MessageTemplateBase):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
+    
+
+class MessageTemplateWithFollowupsCreate(BaseModel):
+    """Schema for creating message templates with AI-generated followups"""
+    subject: str = Field(..., description="Subject line for the initial message")
+    content: str = Field(..., description="Message content")
+    company_id: str = Field(..., description="Company ID")
+    campaign_id: str = Field(..., description="Campaign ID")
+    template_type: TemplateTypeEnum = Field(default=TemplateTypeEnum.initial)
+    is_global: bool = Field(default=True)
+    
+    # AI followup generation options
+    generate_followups: bool = Field(default=True, description="Whether to generate AI followups")
+    ai_provider: Optional[str] = Field(default="openai", description="AI provider: 'openai' or 'gemini'")
+    custom_instructions: Optional[str] = Field(default=None, description="Custom instructions for AI")
+    
+    @field_validator('company_id', 'campaign_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
+    @field_validator('ai_provider')
+    @classmethod
+    def validate_ai_provider(cls, v):
+        if v and v not in ['openai', 'gemini']:
+            raise ValueError("ai_provider must be 'openai' or 'gemini'")
+        return v or 'openai'  # Default to openai if None
+    
+    @model_validator(mode='after')
+    def validate_followup_fields(self):
+        """Validate that initial template has subject"""
+        if self.template_type == TemplateTypeEnum.initial and not self.subject:
+            raise ValueError("Subject is required for initial templates")
+        return self
+
+class MessageTemplateWithFollowupsResponse(BaseModel):
+    """Response schema for template with followups"""
+    # Main template fields
+    id: str
+    subject: Optional[str]
+    content: str
+    company_id: str
+    campaign_id: str
+    template_type: TemplateTypeEnum
+    is_global: bool
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    
+    # Followup templates
+    followup_templates: Optional[List[MessageTemplateBrief]] = None
+    
+    # Generation metadata
+    ai_generation_success: bool = Field(default=True, description="Whether AI generation was successful")
+    ai_provider_used: Optional[str] = Field(default=None, description="AI provider that was used")
+    followup_count: int = Field(default=0, description="Number of followups generated")
+    
+    model_config = {"from_attributes": True}
+    
+    @field_validator('id', 'company_id', 'campaign_id', 'created_by', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+
+# Alternative simple request model (if you prefer structured approach)
+class CreateTemplateWithFollowupsRequest(BaseModel):
+    """Simple request wrapper for the endpoint"""
+    subject: str
+    content: str  
+    company_id: str
+    campaign_id: str
+    template_type: str = "initial"
+    is_global: bool = True
+    generate_followups: bool = True
+    ai_provider: str = "openai"
+    custom_instructions: Optional[str] = None
