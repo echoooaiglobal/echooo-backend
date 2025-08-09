@@ -20,7 +20,7 @@ from routes.api.v0 import (
 )
 from routes.api.v0 import oauth
 from app.Utils.startup import initialize_background_services, shutdown_background_services
-from routes.api.v0 import scheduler
+from routes.api.v0 import scheduler_management  #comprehensive scheduler management API
 
 # Create FastAPI application context manager
 @asynccontextmanager
@@ -115,7 +115,7 @@ app.include_router(results.router, prefix=settings.API_V0_STR)
 app.include_router(profile_analytics.router, prefix=settings.API_V0_STR)
 app.include_router(orders.router, prefix=settings.API_V0_STR)
 app.include_router(oauth.router, prefix=settings.API_V0_STR)
-app.include_router(scheduler.router, prefix=settings.API_V0_STR)
+app.include_router(scheduler_management.router, prefix=settings.API_V0_STR)
 app.include_router(agent_assignments.router, prefix=settings.API_V0_STR)
 app.include_router(assigned_influencers.router, prefix=settings.API_V0_STR)
 app.include_router(influencer_assignment_histories.router, prefix=settings.API_V0_STR)

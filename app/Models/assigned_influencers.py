@@ -1,4 +1,4 @@
-# app/Models/assigned_influencers.py
+# app/Models/assigned_influencers.py - Enhanced with optimized indexes
 
 import uuid
 from sqlalchemy import Column, String, Text, Integer, ForeignKey, DateTime, Enum, func, Index
@@ -33,11 +33,71 @@ class AssignedInfluencer(Base):
     outreach_records = relationship("InfluencerOutreach", back_populates="assigned_influencer", cascade="all, delete-orphan")
     
 
-    # Indexes for performance
+    # Enhanced indexes for performance - OPTIMIZED FOR ARCHIVE OPERATIONS
     __table_args__ = (
+        # Existing indexes (keep these)
         Index('ix_assigned_influencers_influencer_assignment', 'campaign_influencer_id', 'agent_assignment_id'),
         Index('ix_assigned_influencers_type_status', 'type', 'status_id'),
         Index('ix_assigned_influencers_contact_times', 'last_contacted_at', 'next_contact_at'),
         Index('ix_assigned_influencers_assigned_at', 'assigned_at'),
         Index('ix_assigned_influencers_attempts', 'attempts_made'),
+        
+        # NEW: Optimized index for archive query - MOST IMPORTANT
+        # This compound index covers the exact WHERE clause of the archive query
+        Index(
+            'ix_assigned_influencers_archive_candidates',
+            'attempts_made',           # = 3
+            'archived_at',            # IS NULL
+            'type',                   # != 'archived'
+            'last_contacted_at',      # BETWEEN timestamps
+            postgresql_where="attempts_made = 3 AND archived_at IS NULL AND type != 'archived' AND last_contacted_at IS NOT NULL"
+        ),
+        
+        # NEW: Partial index for active unarchived records
+        # This covers the most common queries for active influencers
+        Index(
+            'ix_assigned_influencers_active_unarchived',
+            'type',
+            'archived_at',
+            'last_contacted_at',
+            postgresql_where="archived_at IS NULL AND type = 'active'"
+        ),
+        
+        # NEW: Index for finding recently contacted influencers
+        # Useful for avoiding recent contacts in assignment logic
+        Index(
+            'ix_assigned_influencers_recent_contact',
+            'last_contacted_at',
+            'attempts_made',
+            postgresql_where="last_contacted_at IS NOT NULL AND archived_at IS NULL"
+        ),
+        
+        # NEW: Index for bulk status updates
+        # Helps when updating many records at once
+        Index(
+            'ix_assigned_influencers_bulk_update',
+            'type',
+            'status_id',
+            'archived_at'
+        ),
+        
+        # NEW: Index for agent performance queries
+        # Useful for dashboard/reporting
+        Index(
+            'ix_assigned_influencers_agent_performance',
+            'agent_assignment_id',
+            'type',
+            'archived_at',
+            'responded_at'
+        ),
+        
+        # NEW: Index for campaign tracking
+        # Useful for campaign-level metrics
+        Index(
+            'ix_assigned_influencers_campaign_tracking',
+            'campaign_influencer_id',
+            'type',
+            'attempts_made',
+            'responded_at'
+        )
     )
